@@ -1,7 +1,7 @@
 # Variables
 CXX = g++
 # CXXFLAGS = -std=c++17 -Wall -Winvalid-pch -Wnon-virtual-dtor -Wextra -Werror -Wno-unused-parameter -g
-CXXFLAGS = -std=c++17 -Wall -g
+CXXFLAGS = -std=c++17 -Wall -Winvalid-pch -Wnon-virtual-dtor -g
 
 PKG_CONFIG = pkg-config
 
@@ -15,10 +15,10 @@ INCLUDES = -I. $(LIBCAMERA_CFLAGS) $(LIBEVENT_CFLAGS)  -I/usr/local/include/open
 LIBS = $(LIBCAMERA_LIBS) $(LIBEVENT_LIBS)
 
 # Source files
-SRCS = simple-cam.cpp event_loop.cpp
+SRCS = main.cpp
 
 # Output executable
-TARGET = simple-cam
+TARGET = testVector
 
 # Default target
 all: $(TARGET)

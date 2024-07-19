@@ -8,8 +8,11 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #include <libcamera/libcamera.h>
+#include <span>
+#include <cstdint>
 
 #include "event_loop.h"
 
@@ -47,7 +50,7 @@ static void requestComplete(Request *request)
 	loop.callLater(std::bind(&processRequest, request));
 }
 
-// Implement OpenCV herte
+// Implement OpenCV here
 static void processRequest(Request *request)
 {
 	std::cout << std::endl
@@ -90,6 +93,10 @@ static void processRequest(Request *request)
 		// (Unused) Stream *stream = bufferPair.first;
 		FrameBuffer *buffer = bufferPair.second;
 		const FrameMetadata &metadata = buffer->metadata();
+		// std::vector<int> x;
+		// x = buffer->planes;
+
+		// buffer->planes
 
 		/* Print some information about the buffer which has completed. */
 		std::cout << " seq: " << std::setw(6) << std::setfill('0') << metadata.sequence
@@ -98,16 +105,25 @@ static void processRequest(Request *request)
 
 		unsigned int nplane = 0;
 
-		std::cout << "----------------------------- Printing out Plane data -----------------------------" << std::endl;
+		std::cout << "\n\n----------------------------- Printing out Plane data -----------------------------" << std::endl;
+
 		for (const FrameMetadata::Plane &plane : metadata.planes())
 		{
-			std::cout << plane.bytesused;
+			std::cout << "\nPlane.byteused : " << plane.bytesused << "\tmetadata.planes().size() : " << metadata.planes().size();
 
 			if (++nplane < metadata.planes().size())
 				std::cout << "/";
 		}
 
 		std::cout << std::endl;
+		auto planes = metadata.planes();
+		// Use the planes as needed
+		for (const auto &plane : planes)
+		{
+			std::cout << "Bytes used: " << plane.bytesused << std::endl;
+		}
+
+		// libcamera::Span x;
 
 		/*
 		 * Look into Libcamera Span class
@@ -386,7 +402,7 @@ int main()
 
 	/*
 	 * --------------------------------------------------------------------
-	 * Frame Capture
+	 * Frame Capture [ Maybe use OpenCV here? 7/19/24 ]
 	 *
 	 * libcamera frames capture model is based on the 'Request' concept.
 	 * For each frame a Request has to be queued to the Camera.
@@ -419,6 +435,28 @@ int main()
 	 * IMPORTANT NOTE
 	 *  - Be sure to add the following in VS Code's C/C++ Configurations include path : '/usr/include/libcamera/ **'
 	 *  	- GET RID OF THE EXTRA SPACE BEFORE THE ASTRIKS
+	 *
+	 * Notes about FrameBuffer
+	 * 	- Primary interface for
+	 * 		- Applications
+	 * 		- IPAs
+	 * 		- Pipeline handlers to interact with frame memory
+	 * 	- Has all static/dynamic information to manage entire life cycle of
+	 * 		- Frame capture
+	 * 		- Buffer creation
+	 * 		- Consumption
+	 * 	- Static information
+	 * 		- Describes the memory plane that makes a frame
+	 * 		- The planes are specified when creating the FrameBuffer
+	 * 			- Expressed as a set of :
+	 * 				- dmabuf file descriptors
+	 * 				- offset
+	 * 				- lenght
+	 * 	- Dynamic information
+	 * 		- Grouped in FrameMetadata instance
+	 * 			- It's updated during the processing of a queued capture event
+	 * 			- Valid from the completion of the buffer as signaled by Camera::bufferComplete()
+	 * 				- Until FrameBuffer is either reused in a new request or deleted
 	 */
 	Stream *stream = streamConfig.stream();
 	const std::vector<std::unique_ptr<FrameBuffer>> &buffers = allocator->buffers(stream);
@@ -435,6 +473,7 @@ int main()
 		}
 		const std::unique_ptr<FrameBuffer> &buffer = buffers[i];
 
+		// addBuffer() returns stored pointer
 		int ret = request->addBuffer(stream, buffer.get());
 		if (ret < 0)
 		{
@@ -445,36 +484,19 @@ int main()
 		else
 		{
 			std::cout << "=============================== [ BUFFER DATA ] ===============================" << std::endl;
-			std::cout << "Buffer memory address : " << buffer.get() << std::endl;
-			std::cout << streamConfig.size.toString() << std::endl;
-			std::cout << streamConfig.bufferCount << std::endl;
-			// std::cout << streamConfig.colorSpace << std::endl;
-			std::cout << streamConfig.frameSize << std::endl;
-			std::cout << streamConfig.stride << std::endl;
+
+			// std::cout << "Buffer memory address : " << buffer.get() << std::endl;
+			// std::cout << streamConfig.size.toString() << std::endl;
+			// std::cout << streamConfig.bufferCount << std::endl;
+			// // std::cout << streamConfig.colorSpace << std::endl;
+			// std::cout << streamConfig.frameSize << std::endl;
+			// std::cout << streamConfig.stride << std::endl;
+			// std::cout << streamConfig.stream() << std::endl;
 
 			// std::cout << "Default viewfinder configuration is: "
 			// 		  << streamConfig.toString() << std::endl;
 
-			// stream->configuration(config)
-			// std::cout << stream->configuration() << std::endl;
-			// const std::vector<libcamera::FrameBuffer::Plane> &planes = buffer->planes();
-			// std::cout << planes.size() << std::endl;
-			// for (size_t planeIndex = 0; planeIndex < planes.size(); ++planeIndex)
-			// {
-			// 	const libcamera::FrameBuffer::Plane &plane = planes[planeIndex];
-			// 	uint8_t *data = static_cast<uint8_t *>(plane.mem());
-			// 	size_t size = plane.length();
-			// 	std::cout << "Plane " << planeIndex << " size: " << size << " bytes" << std::endl;
-
-			// 	// Print out the pixel data (example: first 100 bytes for brevity)
-			// 	for (size_t j = 0; j < std::min(size, static_cast<size_t>(100)); ++j)
-			// 	{
-			// 		std::cout << std::hex << static_cast<int>(data[j]) << " ";
-			// 	}
-			// 	std::cout << std::dec << std::endl; // Switch back to decimal
-			// }
-
-			std::cin.get();
+			// std::cin.get();
 		}
 
 		/*
