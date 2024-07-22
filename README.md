@@ -39,7 +39,7 @@ for (StreamConfiguration &config : *configuration_)
 		for (unsigned int i = 0; i < config.bufferCount; i++)
 		{
 			std::string name("rpicam-apps" + std::to_string(i));
-			libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), config.frameSize);
+			libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), config.frameSize); // THIS IS THE SOURCE OF MY MISERY RIGHT NOW
 
 			if (!fd.isValid())
 				throw std::runtime_error("failed to allocate capture buffers for stream");
