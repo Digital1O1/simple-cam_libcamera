@@ -16,8 +16,12 @@
 
 #include "event_loop.h"
 
+// Libraries NOT included in example
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
+
+// #include <dma_heaps.hpp>
 
 #define TIMEOUT_SEC 3
 
@@ -214,7 +218,7 @@ int main()
 	std::cout << " \n======================== [ LISTING CAMERAS ] ========================\n"
 			  << std::endl;
 	for (auto const &camera : cm->cameras())
-		std::cout << " - " << cameraName(camera.get()) << std::endl;
+		std::cout << "CAMERA LISTED --> " << cameraName(camera.get()) << std::endl;
 	std::cout << " \n=====================================================================\n"
 			  << std::endl;
 
@@ -396,13 +400,52 @@ int main()
 			return EXIT_FAILURE;
 		}
 
+		Stream *stream = cfg.stream();
+		std::vector<std::unique_ptr<FrameBuffer>> fb;
+
+		// ------------------ ADDED ------------------ //
+		for (unsigned int i = 0; i < cfg.bufferCount; i++)
+		{
+			std::string name("libcamera-apps" + std::to_string(i));
+			// Used in rpi-cam application
+			// libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), cfg.frameSize);
+
+			//libcamera::DmaHeap::alloc(name.c_str(), cfg.frameSize);
+
+			libcamera::DmaBu
+
+
+
+
+
+
+
+
+			// if (!fd.isValid())
+			// 	throw std::runtime_error("failed to allocate capture buffers for stream");
+
+			// std::vector<FrameBuffer::Plane> plane(1);
+			// plane[0].fd = libcamera::SharedFD(std::move(fd));
+			// plane[0].offset = 0;
+			// plane[0].length = cfg.frameSize;
+
+			// fb.push_back(std::make_unique<FrameBuffer>(plane));
+			// void *memory = mmap(NULL, cfg.frameSize, PROT_READ | PROT_WRITE, MAP_SHARED, plane[0].fd.get(), 0);
+			// mapped_buffers_[fb.back().get()].push_back(
+			// 	libcamera::Span<uint8_t>(static_cast<uint8_t *>(memory), cfg.frameSize));
+		}
+
+		// ------------------ ADDED ------------------ //
+
+		frame_buffers_[stream] = std::move(fb);
+
 		size_t allocated = allocator->buffers(cfg.stream()).size();
 		std::cout << "Allocated [ " << allocated << " ] buffers for stream" << std::endl;
 	}
 
 	/*
 	 * --------------------------------------------------------------------
-	 * Frame Capture [ Maybe use OpenCV here? 7/19/24 ]
+	 * Frame Capture
 	 *
 	 * libcamera frames capture model is based on the 'Request' concept.
 	 * For each frame a Request has to be queued to the Camera.
@@ -436,7 +479,7 @@ int main()
 	 *  - Be sure to add the following in VS Code's C/C++ Configurations include path : '/usr/include/libcamera/ **'
 	 *  	- GET RID OF THE EXTRA SPACE BEFORE THE ASTRIKS
 	 *
-	 * Notes about FrameBuffer
+	 * ---------------------------- Notes about FrameBuffer CLASS ----------------------------
 	 * 	- Primary interface for
 	 * 		- Applications
 	 * 		- IPAs
@@ -457,6 +500,26 @@ int main()
 	 * 			- It's updated during the processing of a queued capture event
 	 * 			- Valid from the completion of the buffer as signaled by Camera::bufferComplete()
 	 * 				- Until FrameBuffer is either reused in a new request or deleted
+	 *
+	 * ---------------------------- Notes about Plane Struct Reference ----------------------------
+	 * - What is it?
+	 * 	- A memory region to store a single plane of a frame
+	 * 		- WHAT EXACTLY IS A FRAME
+	 *	- Planar pixel format uses multiple memory regions to store different color components of a frame
+	 * 	- The Plane struct
+	 * 		- Describes a memory region by a dmabuf file descriptor
+	 * 		- FrameBuffer has either one or multiple frames
+	 * 			- The number of frames are dependent on the pixel format of the frame that's to be stored
+	 *	- The offset
+	 * 		- Identifies the location of the plane data from the start of the memory that's referenced by the dmabuf file descriptor
+	 * 			- Multiple planes can be stored in the same dmabuf
+	 * 			- Which they'll reference the smae dmabuf and DIFFERENT offsets
+	 * 			- No two planes may overlap as specified by their offset and lenght
+	 * 	- Supporting DMA access
+	 * 		- Planes are associated with dmabuf objects represented by ShareFD handles
+	 * 		- The Plane class doesn't handle mapping of the memory to the GPU
+	 * 			- But applications and Image Processing Algorithms (IPAs) may use the dmabuf file descriptors to map the plane memroy with mmap() and access it's contents
+	 *
 	 */
 	Stream *stream = streamConfig.stream();
 	const std::vector<std::unique_ptr<FrameBuffer>> &buffers = allocator->buffers(stream);
@@ -471,9 +534,12 @@ int main()
 			std::cerr << "Can't create request" << std::endl;
 			return EXIT_FAILURE;
 		}
+		// Probably the buffer that's storing the pixel data
 		const std::unique_ptr<FrameBuffer> &buffer = buffers[i];
 
 		// addBuffer() returns stored pointer
+		// request is a pointer for an enum
+		// RequestComplete is a '1'
 		int ret = request->addBuffer(stream, buffer.get());
 		if (ret < 0)
 		{
@@ -481,6 +547,10 @@ int main()
 					  << std::endl;
 			return EXIT_FAILURE;
 		}
+		else if (ret = 0)
+			printf("Reqest Pending....\r\n");
+		else if (ret = 1)
+			printf("Request Complete!\r\n");
 		else
 		{
 			std::cout << "=============================== [ BUFFER DATA ] ===============================" << std::endl;
