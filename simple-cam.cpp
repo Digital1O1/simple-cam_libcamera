@@ -20,7 +20,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
-
+#include <dma-heap.h>
 // #include <dma_heaps.hpp>
 
 #define TIMEOUT_SEC 3
@@ -393,6 +393,8 @@ int main()
 
 	for (StreamConfiguration &cfg : *config)
 	{
+		// allocate() : allocate buffers for configured stream
+		// After successful allocation, allocated buffers can be retrieved with buffers() function
 		int ret = allocator->allocate(cfg.stream());
 		if (ret < 0)
 		{
@@ -403,44 +405,27 @@ int main()
 		Stream *stream = cfg.stream();
 		std::vector<std::unique_ptr<FrameBuffer>> fb;
 
-		// ------------------ ADDED ------------------ //
+		// ------------------ ADDED START ------------------ //
 		for (unsigned int i = 0; i < cfg.bufferCount; i++)
 		{
 			std::string name("libcamera-apps" + std::to_string(i));
-			// Used in rpi-cam application
-			// libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), cfg.frameSize);
 
-			//libcamera::DmaHeap::alloc(name.c_str(), cfg.frameSize);
+			// TRYING TO REPLICATE THE FOLLOWING LINE
+			// libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), config.frameSize);
+			// struct dma_heap_allocation_data alloc = {};
 
-			libcamera::DmaBu
-
-
-
-
-
-
-
-
-			// if (!fd.isValid())
-			// 	throw std::runtime_error("failed to allocate capture buffers for stream");
-
-			// std::vector<FrameBuffer::Plane> plane(1);
-			// plane[0].fd = libcamera::SharedFD(std::move(fd));
-			// plane[0].offset = 0;
-			// plane[0].length = cfg.frameSize;
-
-			// fb.push_back(std::make_unique<FrameBuffer>(plane));
-			// void *memory = mmap(NULL, cfg.frameSize, PROT_READ | PROT_WRITE, MAP_SHARED, plane[0].fd.get(), 0);
-			// mapped_buffers_[fb.back().get()].push_back(
-			// 	libcamera::Span<uint8_t>(static_cast<uint8_t *>(memory), cfg.frameSize));
+			libcamera::UniqueFD x;
 		}
 
-		// ------------------ ADDED ------------------ //
+		// ------------------ ADDED END------------------ //
 
-		frame_buffers_[stream] = std::move(fb);
+		// frame_buffers_[stream] = std::move(fb);
 
 		size_t allocated = allocator->buffers(cfg.stream()).size();
 		std::cout << "Allocated [ " << allocated << " ] buffers for stream" << std::endl;
+
+		struct dma_heap_allocation_data alloc = {};
+		alloc.len = 10;
 	}
 
 	/*

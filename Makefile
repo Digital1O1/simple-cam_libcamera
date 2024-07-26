@@ -11,7 +11,15 @@ LIBCAMERA_LIBS = $(shell $(PKG_CONFIG) --libs libcamera --libs opencv4)
 LIBEVENT_CFLAGS = $(shell $(PKG_CONFIG) --cflags libevent_pthreads)
 LIBEVENT_LIBS = $(shell $(PKG_CONFIG) --libs libevent_pthreads)
 
-INCLUDES = -I. $(LIBCAMERA_CFLAGS) $(LIBEVENT_CFLAGS)  -I/usr/local/include/opencv4
+# Include directories
+INCLUDES = -I. $(LIBCAMERA_CFLAGS) $(LIBEVENT_CFLAGS) \
+           -I/usr/local/include/opencv4 \
+           -I/home/pi/libcamera/include \
+           -I/home/pi/libcamera/include/linux \
+           -I/home/pi/opencv/3rdparty/openjpeg/openjp2 \
+           -I/usr/include
+
+# Libraries
 LIBS = $(LIBCAMERA_LIBS) $(LIBEVENT_LIBS)
 
 # Source files
