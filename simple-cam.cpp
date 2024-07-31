@@ -5,29 +5,29 @@
  * A simple libcamera capture example
  */
 
+// Libraries already included in simple-cam example
 #include <iomanip>
 #include <iostream>
 #include <memory>
 #include <vector>
-
 #include <libcamera/libcamera.h>
 #include <span>
 #include <cstdint>
-
 #include "event_loop.h"
 
 // Libraries NOT included in example
-
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
-#include <dma-heap.h>
-// #include <dma_heaps.hpp>
+#include <linux/dma-heap.h>
+#include <linux/dma-buf.h>
+#include <dma_heaps.hpp>
 
 #define TIMEOUT_SEC 3
 
 using namespace libcamera;
 static std::shared_ptr<Camera> camera;
 static EventLoop loop;
+DmaHeap dma_heap_;
 
 /*
  * --------------------------------------------------------------------
@@ -54,7 +54,6 @@ static void requestComplete(Request *request)
 	loop.callLater(std::bind(&processRequest, request));
 }
 
-// Implement OpenCV here
 static void processRequest(Request *request)
 {
 	std::cout << std::endl
@@ -360,7 +359,7 @@ int main()
 
 	/*
 	 * --------------------------------------------------------------------
-	 * Buffer Allocation
+	 * Buffer Allocation [ IMPLEMENT OPENCV HERE ]
 	 *
 	 * Now that a camera has been configured, it knows all about its
 	 * Streams sizes and formats. The captured images need to be stored in
@@ -411,21 +410,21 @@ int main()
 			std::string name("libcamera-apps" + std::to_string(i));
 
 			// TRYING TO REPLICATE THE FOLLOWING LINE
-			// libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), config.frameSize);
+			// libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), cfg.frameSize);
 			// struct dma_heap_allocation_data alloc = {};
 
-			libcamera::UniqueFD x;
+			// libcamera::UniqueFD x;
 		}
 
 		// ------------------ ADDED END------------------ //
 
 		// frame_buffers_[stream] = std::move(fb);
 
-		size_t allocated = allocator->buffers(cfg.stream()).size();
-		std::cout << "Allocated [ " << allocated << " ] buffers for stream" << std::endl;
+		// size_t allocated = allocator->buffers(cfg.stream()).size();
+		// std::cout << "Allocated [ " << allocated << " ] buffers for stream" << std::endl;
 
-		struct dma_heap_allocation_data alloc = {};
-		alloc.len = 10;
+		// struct dma_heap_allocation_data alloc = {};
+		// alloc.len = 10;
 	}
 
 	/*
@@ -532,9 +531,9 @@ int main()
 					  << std::endl;
 			return EXIT_FAILURE;
 		}
-		else if (ret = 0)
+		else if (ret == 0)
 			printf("Reqest Pending....\r\n");
-		else if (ret = 1)
+		else if (ret == 1)
 			printf("Request Complete!\r\n");
 		else
 		{

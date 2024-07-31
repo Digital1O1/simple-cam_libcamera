@@ -1,7 +1,7 @@
 # Variables
 CXX = g++
-# CXXFLAGS = -std=c++17 -Wall -Winvalid-pch -Wnon-virtual-dtor -Wextra -Werror -Wno-unused-parameter -g
-CXXFLAGS = -std=c++17 -Wall -g
+# CXXFLAGS = -std=c++17 -Wall -g -Winvalid-pch -Wnon-virtual-dtor -Wextra -Werror -Wno-unused-parameter
+CXXFLAGS = -std=c++17 -Wall -g -Winvalid-pch -Wnon-virtual-dtor -Wextra -Wno-unused-parameter
 
 PKG_CONFIG = pkg-config
 
@@ -14,13 +14,15 @@ LIBEVENT_LIBS = $(shell $(PKG_CONFIG) --libs libevent_pthreads)
 # Include directories
 INCLUDES = -I. $(LIBCAMERA_CFLAGS) $(LIBEVENT_CFLAGS) \
            -I/usr/local/include/opencv4 \
-           -I/home/pi/libcamera/include \
-           -I/home/pi/libcamera/include/linux \
            -I/home/pi/opencv/3rdparty/openjpeg/openjp2 \
+           -I/usr/include/rpicam-apps/core \
+           -I/home/pi/libcamera/include/linux \
+           -I/usr/include/rpicam-apps/core \
+           -I/home/pi/rpicam-apps/core \
            -I/usr/include
 
 # Libraries
-LIBS = $(LIBCAMERA_LIBS) $(LIBEVENT_LIBS)
+LIBS = $(LIBCAMERA_LIBS) $(LIBEVENT_LIBS) 
 
 # Source files
 SRCS = simple-cam.cpp event_loop.cpp

@@ -1,3 +1,0 @@
-/home/pi/simple-cam/build/CMakeFiles/simple-cam.dir
-/home/pi/simple-cam/build/CMakeFiles/edit_cache.dir
-/home/pi/simple-cam/build/CMakeFiles/rebuild_cache.dir
