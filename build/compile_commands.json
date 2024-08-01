@@ -1,0 +1,17 @@
+[
+{
+  "directory": "/home/pi/simple-cam_libcamera/build",
+  "command": "/usr/bin/c++  -I/home/pi/simple-cam_libcamera -isystem /usr/include/libcamera -isystem /usr/local/include/opencv4 -Wall -Winvalid-pch -Wnon-virtual-dtor -Wextra -Werror -Wno-unused-parameter -std=gnu++17 -o CMakeFiles/simple-cam.dir/simple-cam.cpp.o -c /home/pi/simple-cam_libcamera/simple-cam.cpp",
+  "file": "/home/pi/simple-cam_libcamera/simple-cam.cpp"
+},
+{
+  "directory": "/home/pi/simple-cam_libcamera/build",
+  "command": "/usr/bin/c++  -I/home/pi/simple-cam_libcamera -isystem /usr/include/libcamera -isystem /usr/local/include/opencv4 -Wall -Winvalid-pch -Wnon-virtual-dtor -Wextra -Werror -Wno-unused-parameter -std=gnu++17 -o CMakeFiles/simple-cam.dir/event_loop.cpp.o -c /home/pi/simple-cam_libcamera/event_loop.cpp",
+  "file": "/home/pi/simple-cam_libcamera/event_loop.cpp"
+},
+{
+  "directory": "/home/pi/simple-cam_libcamera/build",
+  "command": "/usr/bin/c++  -I/home/pi/simple-cam_libcamera -isystem /usr/include/libcamera -isystem /usr/local/include/opencv4 -Wall -Winvalid-pch -Wnon-virtual-dtor -Wextra -Werror -Wno-unused-parameter -std=gnu++17 -o CMakeFiles/simple-cam.dir/image.cpp.o -c /home/pi/simple-cam_libcamera/image.cpp",
+  "file": "/home/pi/simple-cam_libcamera/image.cpp"
+}
+]

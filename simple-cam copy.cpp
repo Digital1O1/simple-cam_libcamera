@@ -5,24 +5,31 @@
  * A simple libcamera capture example
  */
 
+// Libraries already included in simple-cam example
 #include <iomanip>
 #include <iostream>
+#include <memory>
+#include <vector>
+#include <libcamera/libcamera.h>
+#include <span>
+#include <cstdint>
+#include "event_loop.h"
+
+// Libraries NOT included in example
+#include <opencv2/opencv.hpp>
+#include <opencv2/videoio.hpp>
+#include <linux/dma-heap.h>
+#include <linux/dma-buf.h>
+#include "image.h"
 #include <libcamera/formats.h>
 #include <libcamera/stream.h>
 #include <memory>
 
-#include <libcamera/libcamera.h>
-#include <opencv2/opencv.hpp>
-#include "image.h"
-
-#include "event_loop.h"
-
-#define TIMEOUT_SEC 20
+#define TIMEOUT_SEC 3
 
 using namespace libcamera;
 static std::shared_ptr<Camera> camera;
 static EventLoop loop;
-
 std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_;
 
 /*
@@ -99,9 +106,13 @@ static void processRequest(Request *request)
 				  << " bytesused: ";
 
 		unsigned int nplane = 0;
+
+		std::cout << "\n\n----------------------------- Printing out Plane data -----------------------------" << std::endl;
+
 		for (const FrameMetadata::Plane &plane : metadata.planes())
 		{
-			std::cout << plane.bytesused;
+			std::cout << "\nPlane.byteused : " << plane.bytesused << "\tmetadata.planes().size() : " << metadata.planes().size();
+
 			if (++nplane < metadata.planes().size())
 				std::cout << "/";
 		}
@@ -109,36 +120,27 @@ static void processRequest(Request *request)
 		std::cout << std::endl;
 
 		StreamConfiguration const &cfg = stream->configuration();
-
 		std::cout << cfg.size.width << "x" << cfg.size.height << std::endl;
 		std::cout << "\tstride     : " << cfg.stride << std::endl;
 		std::cout << "\tpixelFormat: " << cfg.pixelFormat << std::endl;
+		// auto planes = metadata.planes();
+		// // Use the planes as needed
+		// for (const auto &plane : planes)
+		// {
+		// 	std::cout << "Bytes used: " << plane.bytesused << std::endl;
+		// }
 
-		//		std::cout << "\tcolorSpace : " << (string)cfg.colorSpace << std::endl;
+		// libcamera::Span x;
 
 		/*
+		 * Look into Libcamera Span class
 		 * Image data can be accessed here, but the FrameBuffer
 		 * must be mapped by the application
 		 */
-
 		Image *img = mappedBuffers_[buffer].get();
-		std::cout << "img : " << img << std::endl;
+		std::cout << img << std::endl;
 
 		uint8_t *ptr = (uint8_t *)img->data(0).data();
-		// std::cout << "ptr : " << &ptr << std::endl;
-		/*
-			cv::Mat(int rows,int cols,int type, void *data, size_t step)
-
-			rows :	Number of rows in a 2D array.
-
-			cols :	Number of columns in a 2D array.
-
-			type :	Array type. Use CV_8UC1, ..., CV_64FC4 to create 1-4 channel matrices, or CV_8UC(n), ..., CV_64FC(n) to create multi-channel (up to CV_CN_MAX channels) matrices.
-
-			data :	Pointer to the user data. Matrix constructors that take data and step parameters do not allocate matrix data. Instead, they just initialize the matrix header that points to the specified data, which means that no data is copied. This operation is very efficient and can be used to process external data using OpenCV functions. The external data is not automatically deallocated, so you should take care of it.
-
-			step :	Number of bytes each matrix row occupies. The value should include the padding bytes at the end of each row, if any. If the parameter is missing (set to AUTO_STEP ), no padding is assumed and the actual step is calculated as cols*elemSize(). See Mat::elemSize.
-		*/
 		cv::Mat myMat = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
 		cv::imshow("test", myMat);
 		cv::waitKey(1);
@@ -223,8 +225,12 @@ int main()
 	 * Just as a test, generate names of the Cameras registered in the
 	 * system, and list them.
 	 */
+	std::cout << " \n======================== [ LISTING CAMERAS ] ========================\n"
+			  << std::endl;
 	for (auto const &camera : cm->cameras())
-		std::cout << " - " << cameraName(camera.get()) << std::endl;
+		std::cout << "CAMERA LISTED --> " << cameraName(camera.get()) << std::endl;
+	std::cout << " \n=====================================================================\n"
+			  << std::endl;
 
 	/*
 	 * --------------------------------------------------------------------
@@ -255,7 +261,7 @@ int main()
 		cm->stop();
 		return EXIT_FAILURE;
 	}
-
+	// Use the first available camera in the system
 	std::string cameraId = cm->cameras()[0]->id();
 	camera = cm->get(cameraId);
 	camera->acquire();
@@ -297,6 +303,13 @@ int main()
 	 *
 	 * A Camera produces a CameraConfigration based on a set of intended
 	 * roles for each Stream the application requires.
+	 *
+	 * TL;DR
+	 * 	- Good luck
+	 * 	- Configuration tricky due to assigning resources of the system
+	 * 		- Resources like : DMA engines, scalers, format converters
+	 *	- Camera produces Cameraconfiguration
+	 * 		- Configuration based on roles for each Stream the application required
 	 */
 	std::unique_ptr<CameraConfiguration> config =
 		camera->generateConfiguration({StreamRole::Viewfinder});
@@ -312,21 +325,6 @@ int main()
 	StreamConfiguration &streamConfig = config->at(0);
 	std::cout << "Default viewfinder configuration is: "
 			  << streamConfig.toString() << std::endl;
-
-	for (auto pxlFmts : streamConfig.formats().pixelformats())
-	{
-		std::cout << pxlFmts << std::endl;
-	}
-	/*
-		------------------- [ NOTES ABOUT PIXEL FORMAT START ] -------------------
-
-		------------------- [ NOTES ABOUT PIXEL FORMAT END ] -------------------
-
-	*/
-
-	// Additional supported formats can be found /usr/include/libcamera/libcamera/format.h
-	// streamConfig.pixelFormat = formats::YUYV; // 'Column striations'
-	streamConfig.pixelFormat = formats::YUV420; // Results in grayscale w/o striations
 
 	/*
 	 * Each StreamConfiguration parameter which is part of a
@@ -362,7 +360,7 @@ int main()
 	 */
 	config->validate();
 	std::cout << "Validated viewfinder configuration is: "
-			  << streamConfig.toString() << std::endl;
+			  << streamConfig.toString() << std::endl; // Validated viewfinder configuration is: 800x600-XRGB8888
 
 	/*
 	 * Once we have a validated configuration, we can apply it to the
@@ -372,7 +370,7 @@ int main()
 
 	/*
 	 * --------------------------------------------------------------------
-	 * Buffer Allocation
+	 * Buffer Allocation [ IMPLEMENT OPENCV HERE ]
 	 *
 	 * Now that a camera has been configured, it knows all about its
 	 * Streams sizes and formats. The captured images need to be stored in
@@ -390,11 +388,23 @@ int main()
 	 * buffers allocated in the Camera using a FrameBufferAllocator
 	 * instance and referencing a configured Camera to determine the
 	 * appropriate buffer size and types to create.
+	 *
+	 * TL;DR
+	 * 	- Captured images stored in framebuffer
+	 * 		- Image data can be used by application, library or allocated in the camera
+	 *	- Applications might want to  allocate framebuffer elsewhere
+	 * 		- Example : Memory allocated by display buffer will render the captured frames
+	 * 		- Application can them provide the buffers to libcamera by constructing FrameBuffer instances to cpature image data directly into it
+	 * 		- Alternatively
+	 * 			- libcamera can export buffers allocated in camera by using FrameBufferAllocator instances
+	 * 			- Then refernce a camera to figure out the buffer size/type to create
 	 */
 	FrameBufferAllocator *allocator = new FrameBufferAllocator(camera);
 
 	for (StreamConfiguration &cfg : *config)
 	{
+		// allocate() : allocate buffers for configured stream
+		// After successful allocation, allocated buffers can be retrieved with buffers() function
 		int ret = allocator->allocate(cfg.stream());
 		if (ret < 0)
 		{
@@ -402,15 +412,30 @@ int main()
 			return EXIT_FAILURE;
 		}
 
-		size_t allocated = allocator->buffers(cfg.stream()).size();
-		std::cout << "Allocated " << allocated << " buffers for stream" << std::endl;
+		// Stream *stream = cfg.stream();
+		// std::vector<std::unique_ptr<FrameBuffer>> fb;
 
-		for (const std::unique_ptr<FrameBuffer> &buffer : allocator->buffers(cfg.stream()))
+		// ------------------ ADDED START ------------------ //
+		for (unsigned int i = 0; i < cfg.bufferCount; i++)
 		{
-			std::unique_ptr<Image> image = Image::fromFrameBuffer(buffer.get(), Image::MapMode::ReadOnly);
-			assert(image != nullptr);
-			mappedBuffers_[buffer.get()] = std::move(image);
+			std::string name("libcamera-apps" + std::to_string(i));
+
+			// TRYING TO REPLICATE THE FOLLOWING LINE
+			// libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), cfg.frameSize);
+			// struct dma_heap_allocation_data alloc = {};
+
+			// libcamera::UniqueFD x;
 		}
+
+		// ------------------ ADDED END------------------ //
+
+		// frame_buffers_[stream] = std::move(fb);
+
+		// size_t allocated = allocator->buffers(cfg.stream()).size();
+		// std::cout << "Allocated [ " << allocated << " ] buffers for stream" << std::endl;
+
+		// struct dma_heap_allocation_data alloc = {};
+		// alloc.len = 10;
 	}
 
 	/*
@@ -430,10 +455,72 @@ int main()
 	 * Once a request completes, all its buffers will contain image data
 	 * that applications can access and for each of them a list of metadata
 	 * properties that reports the capture parameters applied to the image.
+	 *
+	 * TL;DR
+	 * 	- Capture model based on 'Request' concept
+	 * 		- Each frame requested to be queued to camera
+	 * 	- What is a request?
+	 * 		- Refers to at least one Stream
+	 * 		- With it being filled with image data that's to be added to the Request
+	 * 	- Request associated with list of Controls
+	 * 		- Tuneable parameters that's similar to v4l2_controls
+	 * 			- Assume this is where I can change camera parameters?
+	 * 		- That's applied to image
+	 * 	- Once request completes
+	 * 		- All the buffers will have image data that an applicantion can have access to the image data
+	 * 		- To include a list of the metadata that reports capture parametrs applied to the image
+	 *
+	 * IMPORTANT NOTE
+	 *  - Be sure to add the following in VS Code's C/C++ Configurations include path : '/usr/include/libcamera/ **'
+	 *  	- GET RID OF THE EXTRA SPACE BEFORE THE ASTRIKS
+	 *
+	 * ---------------------------- Notes about FrameBuffer CLASS ----------------------------
+	 * 	- Primary interface for
+	 * 		- Applications
+	 * 		- IPAs
+	 * 		- Pipeline handlers to interact with frame memory
+	 * 	- Has all static/dynamic information to manage entire life cycle of
+	 * 		- Frame capture
+	 * 		- Buffer creation
+	 * 		- Consumption
+	 * 	- Static information
+	 * 		- Describes the memory plane that makes a frame
+	 * 		- The planes are specified when creating the FrameBuffer
+	 * 			- Expressed as a set of :
+	 * 				- dmabuf file descriptors
+	 * 				- offset
+	 * 				- lenght
+	 * 	- Dynamic information
+	 * 		- Grouped in FrameMetadata instance
+	 * 			- It's updated during the processing of a queued capture event
+	 * 			- Valid from the completion of the buffer as signaled by Camera::bufferComplete()
+	 * 				- Until FrameBuffer is either reused in a new request or deleted
+	 *
+	 * ---------------------------- Notes about Plane Struct Reference ----------------------------
+	 * - What is it?
+	 * 	- A memory region to store a single plane of a frame
+	 * 		- WHAT EXACTLY IS A FRAME
+	 *	- Planar pixel format uses multiple memory regions to store different color components of a frame
+	 * 	- The Plane struct
+	 * 		- Describes a memory region by a dmabuf file descriptor
+	 * 		- FrameBuffer has either one or multiple frames
+	 * 			- The number of frames are dependent on the pixel format of the frame that's to be stored
+	 *	- The offset
+	 * 		- Identifies the location of the plane data from the start of the memory that's referenced by the dmabuf file descriptor
+	 * 			- Multiple planes can be stored in the same dmabuf
+	 * 			- Which they'll reference the smae dmabuf and DIFFERENT offsets
+	 * 			- No two planes may overlap as specified by their offset and lenght
+	 * 	- Supporting DMA access
+	 * 		- Planes are associated with dmabuf objects represented by ShareFD handles
+	 * 		- The Plane class doesn't handle mapping of the memory to the GPU
+	 * 			- But applications and Image Processing Algorithms (IPAs) may use the dmabuf file descriptors to map the plane memroy with mmap() and access it's contents
+	 *
 	 */
 	Stream *stream = streamConfig.stream();
 	const std::vector<std::unique_ptr<FrameBuffer>> &buffers = allocator->buffers(stream);
 	std::vector<std::unique_ptr<Request>> requests;
+
+	// By default buffers.size() == 4
 	for (unsigned int i = 0; i < buffers.size(); ++i)
 	{
 		std::unique_ptr<Request> request = camera->createRequest();
@@ -442,8 +529,12 @@ int main()
 			std::cerr << "Can't create request" << std::endl;
 			return EXIT_FAILURE;
 		}
-
+		// Probably the buffer that's storing the pixel data
 		const std::unique_ptr<FrameBuffer> &buffer = buffers[i];
+
+		// addBuffer() returns stored pointer
+		// request is a pointer for an enum
+		// RequestComplete is a '1'
 		int ret = request->addBuffer(stream, buffer.get());
 		if (ret < 0)
 		{
@@ -451,12 +542,34 @@ int main()
 					  << std::endl;
 			return EXIT_FAILURE;
 		}
+		else if (ret == 0)
+			printf("Reqest Pending....\r\n");
+		else if (ret == 1)
+			printf("Request Complete!\r\n");
+		else
+		{
+			std::cout << "=============================== [ BUFFER DATA ] ===============================" << std::endl;
+
+			// std::cout << "Buffer memory address : " << buffer.get() << std::endl;
+			// std::cout << streamConfig.size.toString() << std::endl;
+			// std::cout << streamConfig.bufferCount << std::endl;
+			// // std::cout << streamConfig.colorSpace << std::endl;
+			// std::cout << streamConfig.frameSize << std::endl;
+			// std::cout << streamConfig.stride << std::endl;
+			// std::cout << streamConfig.stream() << std::endl;
+
+			// std::cout << "Default viewfinder configuration is: "
+			// 		  << streamConfig.toString() << std::endl;
+
+			// std::cin.get();
+		}
 
 		/*
 		 * Controls can be added to a request on a per frame basis.
 		 */
 		ControlList &controls = request->controls();
 		controls.set(controls::Brightness, 0.5);
+		// controls.set(controls::ScalerCrop = ) // Come back to this later
 
 		requests.push_back(std::move(request));
 	}
@@ -479,6 +592,22 @@ int main()
 	 * In order to receive the notification for request completions,
 	 * applications shall connecte a Slot to the Camera 'requestCompleted'
 	 * Signal before the camera is started.
+	 *
+	 * TL;DR
+	 * 	- Libcamera uses Signals&Slot
+	 * 		- System used to connect events to callback operations that are used to handle them
+	 * 	- Signals
+	 * 		- Events emitted by class instance
+	 *	- Slots
+	 *		- Callbacks that can be connected to a Signal
+	 *	- Camera exposes Signals
+	 * 		- Done so to report completion of:
+	 * 			- A request
+	 * 			- And the completion of a buffer that's part of a request to support partial request completions
+	 * 	- To recieve notifcations for request completions
+	 * 		- Application connects a Slot to Camera 'requestCompelted'
+	 * 		- Signal before the camera is started
+	 *
 	 */
 	camera->requestCompleted.connect(requestComplete);
 
