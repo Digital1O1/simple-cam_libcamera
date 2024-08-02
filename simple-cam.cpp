@@ -14,7 +14,6 @@
 #include <libcamera/libcamera.h>
 #include <opencv2/opencv.hpp>
 #include "image.h"
-
 #include "event_loop.h"
 
 #define TIMEOUT_SEC 20
@@ -109,10 +108,11 @@ static void processRequest(Request *request)
 		std::cout << std::endl;
 
 		StreamConfiguration const &cfg = stream->configuration();
-
-		std::cout << cfg.size.width << "x" << cfg.size.height << std::endl;
+		std::cout << "\n --------------------------- [DEBUG INFORMATION ]---------------------------" << std::endl;
+		std::cout << "\n\tResolution : " << cfg.size.width << "x" << cfg.size.height << std::endl;
 		std::cout << "\tstride     : " << cfg.stride << std::endl;
 		std::cout << "\tpixelFormat: " << cfg.pixelFormat << std::endl;
+		std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
 
 		//		std::cout << "\tcolorSpace : " << (string)cfg.colorSpace << std::endl;
 
@@ -313,12 +313,36 @@ int main()
 	std::cout << "Default viewfinder configuration is: "
 			  << streamConfig.toString() << std::endl;
 
-	for (auto pxlFmts : streamConfig.formats().pixelformats())
-	{
-		std::cout << pxlFmts << std::endl;
-	}
+	// for (auto pxlFmts : streamConfig.formats().pixelformats())
+	// {
+	// 	std::cout << pxlFmts << std::endl;
+	// }
 	/*
 		------------------- [ NOTES ABOUT PIXEL FORMAT START ] -------------------
+
+		YUV420
+			- Color encoding system
+			- Commonly used in video compression/transmission
+			- Structure
+				- Y component : Represents luminance (brightness) of the image
+					- Luminance definiton : measurement of the amount of light emitted/reflected/transmitted by a surface
+					- Corresponds to the perceived brightness of that surface
+				- U and V components : Represents chrominance/color information
+					- U --> The difference between blue and luminance
+					- V --> The difference between red and luminance
+			- Chroma Subsampling
+				- 4:2:0 Subsampling
+					- For every 4 luminance (Y) samples there's 1 chrominance sample for both U and V
+			- Advantages
+				- Compression efficiency
+					- Reducing amount of chrominance/color data allows for significant data c
+					  ompression w/o greatly affecting perceived image quality
+					- Human vision more sensitive to brightness changes vs color changes
+			- Disadvantages
+				- Reduced color resolution
+					- The chroma subsampling can cause loss of color detail, particularly in areas with sharp color transitions
+				- Artifacts
+					- Could introduce artifacts in high-contrast edges due to lower resolution of chrominance information
 
 		------------------- [ NOTES ABOUT PIXEL FORMAT END ] -------------------
 
@@ -327,6 +351,8 @@ int main()
 	// Additional supported formats can be found /usr/include/libcamera/libcamera/format.h
 	// streamConfig.pixelFormat = formats::YUYV; // 'Column striations'
 	streamConfig.pixelFormat = formats::YUV420; // Results in grayscale w/o striations
+	streamConfig.size.width = 1280;
+	streamConfig.size.height = 720;
 
 	/*
 	 * Each StreamConfiguration parameter which is part of a
