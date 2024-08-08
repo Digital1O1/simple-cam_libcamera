@@ -109,13 +109,22 @@ static void processRequest(Request *request)
 		std::cout << std::endl;
 
 		StreamConfiguration const &cfg = stream->configuration();
-		// std::cout << "\n --------------------------- [DEBUG INFORMATION ]---------------------------" << std::endl;
-		// std::cout << "\n"
-		// 		  << "Resolution" << " : " << cfg.size.width << " x " << cfg.size.height << std::endl;
-		// std::cout << "Number of bytes in each line of image buffer " << " : " << cfg.stride << std::endl;
-		// std::cout << "pixelFormat" << " : " << cfg.pixelFormat << std::endl;
-		// std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
-		// std::cout << "\tcolorSpace : " << (string)cfg.colorSpace << std::endl;
+
+		if (cfg.colorSpace.has_value())
+		{
+			std::cout << "Color space is set." << std::endl;
+
+			// Get the ColorSpace object
+			// const libcamera::ColorSpace &colorSpace = cfg.colorSpace.value();
+
+			// std::string colorSpaceStr = colorSpace.toString();
+			// std::cout << "Color Space: " << colorSpaceStr << std::endl;
+		}
+		else
+		{
+			std::cout << "Color space is not set." << std::endl;
+			exit(1);
+		}
 
 		/*
 		 * Image data can be accessed here, but the FrameBuffer
@@ -124,13 +133,18 @@ static void processRequest(Request *request)
 		 */
 
 		Image *img = mappedBuffers_[buffer].get();
+		const libcamera::ColorSpace &colorSpace = cfg.colorSpace.value();
 
+		std::string colorSpaceStr = colorSpace.toString();
 		std::cout << "\n --------------------------- [DEBUG INFORMATION ]---------------------------" << std::endl;
 		std::cout << "\n"
 				  << "Resolution" << " : " << cfg.size.width << " x " << cfg.size.height << std::endl;
 		std::cout << "Number of bytes in each line of image buffer " << " : " << cfg.stride << std::endl;
 		std::cout << "pixelFormat" << " : " << cfg.pixelFormat << std::endl;
 		std::cout << "img->numPlanes() : " << img->numPlanes() << std::endl;
+		std::cout << "Color Space : " << colorSpaceStr << std::endl;
+
+		// std::cout << "\tcolorSpace : " << cfg.toString() << std::endl;
 
 		std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
 
@@ -179,7 +193,7 @@ static void processRequest(Request *request)
 
 		cv::namedWindow("luminanceData", cv::WINDOW_AUTOSIZE);
 		cv::imshow("luminanceData", luminanceData);
-		cv::moveWindow("luminanceData", 0, 100);
+		cv::moveWindow("luminanceData", 100, 100);
 
 		// cv::namedWindow("COLOR_YUV420p2RGB", cv::WINDOW_AUTOSIZE);
 		// cv::imshow("COLOR_YUV420p2RGB", rgb);
@@ -188,8 +202,14 @@ static void processRequest(Request *request)
 		// cv::imshow("uvData", uvData);
 		// cv::moveWindow("uvData", 400, 500);
 
+		cv::namedWindow("uData", cv::WINDOW_AUTOSIZE);
 		cv::imshow("uData", uData);
+		cv::moveWindow("uData", 1600, 600);
+
+		cv::namedWindow("vData", cv::WINDOW_AUTOSIZE);
 		cv::imshow("vData", vData);
+		cv::moveWindow("vData", 1600, 100);
+
 		// cv::imshow("RGB Frame", rgbFrame);
 		cv::waitKey(1);
 	}
