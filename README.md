@@ -39,45 +39,52 @@ Possible solution
 	cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
 	cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 ```
-
+```
 Memory Layout:
 
 +-----------------------------------+
 
+Width = 1280 pixels
+Height = 720 pixels
+Total bytes = 1280 * 720 = 921,600 bytes
+
 | Y Plane (1280 x 720) |
-
 |   [Y0, Y1, ..., Y1279] |
-
 |   [Y1280, ..., Y2559] |
-
 |   ...               |
-
 |   [Y, ..., Y923199]  |
-
-+-----------------------------------+ <- ptr (start of U Plane)
-
+ 
++-----------------------------------+ <- ptr (start of U Plane) 
 | U Plane (640 x 360) |
 
+Width = 640 pixels
+Height = 360 pixels
+Total bytes = Size of U plane = 640 * 360 = 230,400 bytes
+
+ptr_U = ptr_Y + Size of Y Plane
+ptr_U = ptr + 921,600 bytes
+
 |   [U0, U1, ..., U639] |
-
 |   [U640, ..., U1279] |
-
 |   ...               |
-
 |   [U, ..., U115199]  |
 
 +-----------------------------------+ <- ptr (start of V Plane)
-
 | V Plane (640 x 360) |
 
+Width = 640 pixels
+Height = 360 pixels
+Total bytes = Size of V plane = 640 * 360 = 230,400 bytes
+
+ptr_V = ptr_U + Size of U Plane
+ptr_V = ptr + 921,600 bytes + 230,400 bytes
+ptr_V = ptr + 1,152,000 bytes
+
 |   [V0, V1, ..., V639] |
-
 |   [V640, ..., V1279] |
-
 |   ...               |
-
 |   [V, ..., V115199]  |
 
 +-----------------------------------+
-
+```
 
