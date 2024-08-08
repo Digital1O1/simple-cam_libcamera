@@ -1,4 +1,9 @@
 # Things to do/try out
+- Having the YUV imshow()'s display windows to act consistently
+  - U/V channels are fine
+  - Y isn't
+- Read up on Rec709/601
+
 
 # Useful references 
 - [Libcamera : Conversation of YUV420 into RGB](https://forums.raspberrypi.com/viewtopic.php?t=340757#p2041710)
@@ -11,3 +16,4 @@
 # Things to read 
 - https://stackoverflow.com/questions/27822017/planar-yuv420-data-layout
 - [2.7.1.2. Planar YUV formats](https://docs.kernel.org/userspace-api/media/v4l/pixfmt-yuv-planar.html)
+- [YcbcrEncoding](https://libcamera.org/api-html/classlibcamera_1_1ColorSpace.html)

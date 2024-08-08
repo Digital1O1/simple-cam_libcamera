@@ -7,6 +7,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <string.h>
 #include <libcamera/formats.h>
 #include <libcamera/stream.h>
 #include <memory>
@@ -17,7 +18,8 @@
 #include "event_loop.h"
 
 #define TIMEOUT_SEC 50
-
+#define RESOLUTION_WIDTH 640
+#define RESOLUTION_LENGTH 480
 using namespace libcamera;
 static std::shared_ptr<Camera> camera;
 static EventLoop loop;
@@ -133,18 +135,20 @@ static void processRequest(Request *request)
 		 */
 
 		Image *img = mappedBuffers_[buffer].get();
-		const libcamera::ColorSpace &colorSpace = cfg.colorSpace.value();
-
+		const libcamera::ColorSpace &colorSpace = libcamera::ColorSpace(cfg.colorSpace.value());
 		std::string colorSpaceStr = colorSpace.toString();
+
 		std::cout << "\n --------------------------- [DEBUG INFORMATION ]---------------------------" << std::endl;
 		std::cout << "\n"
 				  << "Resolution" << " : " << cfg.size.width << " x " << cfg.size.height << std::endl;
 		std::cout << "Number of bytes in each line of image buffer " << " : " << cfg.stride << std::endl;
 		std::cout << "pixelFormat" << " : " << cfg.pixelFormat << std::endl;
 		std::cout << "img->numPlanes() : " << img->numPlanes() << std::endl;
-		std::cout << "Color Space : " << colorSpaceStr << std::endl;
-
-		// std::cout << "\tcolorSpace : " << cfg.toString() << std::endl;
+		std::cout << "Color Space : " << colorSpaceStr << std::endl;																		  // sYCC
+		std::cout << "colorSpace.Primaries : " << (int)libcamera::ColorSpace::Primaries(colorSpace.primaries) << std::endl;					  // Rec709
+		std::cout << "colorSpace.TransferFunction : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.transferFunction) << std::endl; // Srgb
+		std::cout << "colorSpace.ycbcrEncoding : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.ycbcrEncoding) << std::endl;		  // Rec601
+		std::cout << "colorSpace.Range : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.range) << std::endl;						  // Full
 
 		std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
 
@@ -154,25 +158,17 @@ static void processRequest(Request *request)
 		// std::cout << "ptr : " << &ptr << std::endl;
 		/*
 			cv::Mat(int rows,int cols,int type, void *data, size_t step)
-
 			rows
 				- Number of rows in a 2D array.
-
 			cols
 				- Number of columns in a 2D array.
-
 			type
 				- Array type. Use CV_8UC1, ..., CV_64FC4 to create 1-4 channel matrices, or CV_8UC(n), ..., CV_64FC(n) to create multi-channel (up to CV_CN_MAX channels) matrices.
-
 			data
 				- Pointer to the user data. Matrix constructors that take data and step parameters do not allocate matrix data. Instead, they just initialize the matrix header that points to the specified data, which means that no data is copied. This operation is very efficient and can be used to process external data using OpenCV functions. The external data is not automatically deallocated, so you should take care of it.
-
 			step
 				- Number of bytes each matrix row occupies. The value should include the padding bytes at the end of each row, if any. If the parameter is missing (set to AUTO_STEP ), no padding is assumed and the actual step is calculated as cols*elemSize(). See Mat::elemSize.
 
-				check
-				- pixelformat info
-				-
 		*/
 
 		// Things to do
@@ -180,20 +176,22 @@ static void processRequest(Request *request)
 		// - Use cv::merge() to combine everything then use cv::imshow() to verify
 		// Gets all LUMINANCE data
 
-		cv::Mat luminanceData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
+		cv::Mat luminanceData = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
 		cv::Mat rgb;
-		// cv::cvtColor(luminanceData, rgb, cv::COLOR_YUV420p2RGB);
-		//  cv::Mat luminanceData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
-		//  cv::Mat uvData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.stride * cfg.size.height, cfg.stride);
-		//  cv::Mat luminanceData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr);
-		cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
-		cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
-		// cv::Mat rgbMat;
-		// cv::cvtColor(uvData, rgbMat, cv::COLOR_YUV420p2RGB);
+		cv::Size fixedResolution(RESOLUTION_WIDTH, RESOLUTION_LENGTH);
+		cv::Size fixedResolutionLuminance(cfg.size.height * 3 / 2, cfg.size.width);
 
-		cv::namedWindow("luminanceData", cv::WINDOW_AUTOSIZE);
+		cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
+
+		cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
+
+		cv::resize(luminanceData, luminanceData, fixedResolution);
+		cv::resize(uData, uData, fixedResolution);
+		cv::resize(vData, vData, fixedResolution);
+
+		// cv::namedWindow("luminanceData", cv::WINDOW_AUTOSIZE);
+		// cv::moveWindow("luminanceData", 100, 100);
 		cv::imshow("luminanceData", luminanceData);
-		cv::moveWindow("luminanceData", 100, 100);
 
 		// cv::namedWindow("COLOR_YUV420p2RGB", cv::WINDOW_AUTOSIZE);
 		// cv::imshow("COLOR_YUV420p2RGB", rgb);
@@ -203,12 +201,12 @@ static void processRequest(Request *request)
 		// cv::moveWindow("uvData", 400, 500);
 
 		cv::namedWindow("uData", cv::WINDOW_AUTOSIZE);
-		cv::imshow("uData", uData);
 		cv::moveWindow("uData", 1600, 600);
+		cv::imshow("uData", uData);
 
 		cv::namedWindow("vData", cv::WINDOW_AUTOSIZE);
+		cv::moveWindow("vData", 800, 100);
 		cv::imshow("vData", vData);
-		cv::moveWindow("vData", 1600, 100);
 
 		// cv::imshow("RGB Frame", rgbFrame);
 		cv::waitKey(1);
@@ -422,8 +420,8 @@ int main()
 	// streamConfig.pixelFormat = formats::YUYV; // 'Column striations'
 	streamConfig.pixelFormat = formats::YUV420; // Results in grayscale w/o striations
 
-	streamConfig.size.width = 1280;
-	streamConfig.size.height = 720;
+	streamConfig.size.width = RESOLUTION_WIDTH;
+	streamConfig.size.height = RESOLUTION_LENGTH;
 
 	/*
 	 * Each StreamConfiguration parameter which is part of a
