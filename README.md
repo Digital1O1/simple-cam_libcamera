@@ -29,33 +29,35 @@ Possible solution
     ```
 - Need to figure out how to get DMA stuff to work strictly with libcamera and NOT anything related to rpicam app
   - File of interest : rpicam_app.cpp
- 
+### Get a better understanding of pointer math
+- Below is a visual of what's going on with the three seperate Mat objects that's holding `all the data` the `U` data and the `V` data
+
 ```cpp
-for (StreamConfiguration &config : *configuration_)
-	{
-		Stream *stream = config.stream();
-		std::vector<std::unique_ptr<FrameBuffer>> fb;
-
-		for (unsigned int i = 0; i < config.bufferCount; i++)
-		{
-			std::string name("rpicam-apps" + std::to_string(i));
-			libcamera::UniqueFD fd = dma_heap_.alloc(name.c_str(), config.frameSize); // THIS IS THE SOURCE OF MY MISERY RIGHT NOW
-
-			if (!fd.isValid())
-				throw std::runtime_error("failed to allocate capture buffers for stream");
-
-			std::vector<FrameBuffer::Plane> plane(1);
-			plane[0].fd = libcamera::SharedFD(std::move(fd));
-			plane[0].offset = 0;
-			plane[0].length = config.frameSize;
-
-			fb.push_back(std::make_unique<FrameBuffer>(plane));
-			void *memory = mmap(NULL, config.frameSize, PROT_READ | PROT_WRITE, MAP_SHARED, plane[0].fd.get(), 0);
-			mapped_buffers_[fb.back().get()].push_back(
-						libcamera::Span<uint8_t>(static_cast<uint8_t *>(memory), config.frameSize));
-		}
-
-		frame_buffers_[stream] = std::move(fb);
-	}
-	LOG(2, "Buffers allocated and mapped");
+	// cfg.size.height = 720
+	// cfg.size.width  = 1280
+	cv::Mat luminanceData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
+	cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
+	cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 ```
+
+- Memory Layout:
++-------------------+
+| Y Plane (1280 x 720) |
+|   [Y0, Y1, ..., Y1279] |
+|   [Y1280, ..., Y2559] |
+|   ...               |
+|   [Y, ..., Y923199]  |
++-------------------+ <- ptr (start of U Plane)
+| U Plane (640 x 360) |
+|   [U0, U1, ..., U639] |
+|   [U640, ..., U1279] |
+|   ...               |
+|   [U, ..., U115199]  |
++-------------------+ <- ptr (start of V Plane)
+| V Plane (640 x 360) |
+|   [V0, V1, ..., V639] |
+|   [V640, ..., V1279] |
+|   ...               |
+|   [V, ..., V115199]  |
++-------------------+
+
