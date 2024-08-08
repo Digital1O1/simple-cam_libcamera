@@ -40,24 +40,44 @@ Possible solution
 	cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 ```
 
-- Memory Layout:
-+-------------------+
+Memory Layout:
+
++-----------------------------------+
+
 | Y Plane (1280 x 720) |
+
 |   [Y0, Y1, ..., Y1279] |
+
 |   [Y1280, ..., Y2559] |
+
 |   ...               |
+
 |   [Y, ..., Y923199]  |
-+-------------------+ <- ptr (start of U Plane)
+
++-----------------------------------+ <- ptr (start of U Plane)
+
 | U Plane (640 x 360) |
+
 |   [U0, U1, ..., U639] |
+
 |   [U640, ..., U1279] |
+
 |   ...               |
+
 |   [U, ..., U115199]  |
-+-------------------+ <- ptr (start of V Plane)
+
++-----------------------------------+ <- ptr (start of V Plane)
+
 | V Plane (640 x 360) |
+
 |   [V0, V1, ..., V639] |
+
 |   [V640, ..., V1279] |
+
 |   ...               |
+
 |   [V, ..., V115199]  |
-+-------------------+
+
++-----------------------------------+
+
 
