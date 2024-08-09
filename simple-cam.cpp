@@ -557,10 +557,8 @@ int main()
 		ControlList &controls = request->controls();
 		// controls.set(controls::Brightness, 0.5); // This was here orignally
 		controls.set(controls::AE_ENABLE, true);
-
 		requests.push_back(std::move(request));
 	}
-	// banana
 
 	/*
 	 * --------------------------------------------------------------------
