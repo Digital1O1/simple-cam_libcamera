@@ -69,8 +69,10 @@ static void processRequest(Request *request)
 	 * of these items and process them according to its needs.
 	 */
 	const ControlList &requestMetadata = request->metadata();
+
 	for (const auto &ctrl : requestMetadata)
 	{
+
 		const ControlId *id = controls::controls.at(ctrl.first);
 		const ControlValue &value = ctrl.second;
 
@@ -236,6 +238,7 @@ static void processRequest(Request *request)
 std::string cameraName(Camera *camera)
 {
 	const ControlList &props = camera->properties();
+
 	std::string name;
 
 	const auto &location = props.get(properties::Location);
@@ -328,23 +331,6 @@ int main()
 	std::string cameraId = cm->cameras()[0]->id();
 	camera = cm->get(cameraId);
 	camera->acquire();
-
-	ControlInfoMap camControls =
-		camera->controls();
-
-	for (auto ctr : camControls)
-	{
-		std::cout << (std::string)ctr.first->name() << ": \t" << ctr.second.toString() << std::endl;
-	}
-
-	// camera->stop();
-	// allocator->free(stream);
-	// delete allocator;
-	camera->release();
-	camera.reset();
-	cm->stop();
-
-	return 0;
 
 	/*
 	 * Stream
@@ -569,10 +555,12 @@ int main()
 		 * Controls can be added to a request on a per frame basis.
 		 */
 		ControlList &controls = request->controls();
-		controls.set(controls::Brightness, 0.5);
+		// controls.set(controls::Brightness, 0.5); // This was here orignally
+		controls.set(controls::AE_ENABLE, true);
 
 		requests.push_back(std::move(request));
 	}
+	// banana
 
 	/*
 	 * --------------------------------------------------------------------
