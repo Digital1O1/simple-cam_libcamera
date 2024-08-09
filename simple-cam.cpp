@@ -16,6 +16,7 @@
 #include <opencv2/opencv.hpp>
 #include "image.h"
 #include "event_loop.h"
+#include <X11/Xlib.h>
 
 #define TIMEOUT_SEC 50
 #define RESOLUTION_WIDTH 640
@@ -112,17 +113,7 @@ static void processRequest(Request *request)
 
 		StreamConfiguration const &cfg = stream->configuration();
 
-		if (cfg.colorSpace.has_value())
-		{
-			std::cout << "Color space is set." << std::endl;
-
-			// Get the ColorSpace object
-			// const libcamera::ColorSpace &colorSpace = cfg.colorSpace.value();
-
-			// std::string colorSpaceStr = colorSpace.toString();
-			// std::cout << "Color Space: " << colorSpaceStr << std::endl;
-		}
-		else
+		if (!cfg.colorSpace.has_value())
 		{
 			std::cout << "Color space is not set." << std::endl;
 			exit(1);
@@ -176,29 +167,38 @@ static void processRequest(Request *request)
 		// - Use cv::merge() to combine everything then use cv::imshow() to verify
 		// Gets all LUMINANCE data
 
-		cv::Mat luminanceData = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
-		cv::Mat rgb;
+		// RPI Screen stuff
+		// Display *d = XOpenDisplay(NULL);
+		// Screen *s = DefaultScreenOfDisplay(d);
+
+		// int screen_width = s->width;
+		// int screen_height = s->height;
+
 		cv::Size fixedResolution(RESOLUTION_WIDTH, RESOLUTION_LENGTH);
 		cv::Size fixedResolutionLuminance(cfg.size.height * 3 / 2, cfg.size.width);
 
+		cv::Mat allData = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
+		cv::Mat yData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
 		cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
-
 		cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 
-		cv::resize(luminanceData, luminanceData, fixedResolution);
-		cv::resize(uData, uData, fixedResolution);
-		cv::resize(vData, vData, fixedResolution);
+		cv::resize(uData, uData, fixedResolution, 0, 0, cv::INTER_LINEAR);
+		cv::resize(vData, vData, fixedResolution, 0, 0, cv::INTER_LINEAR);
 
-		// cv::namedWindow("luminanceData", cv::WINDOW_AUTOSIZE);
-		// cv::moveWindow("luminanceData", 100, 100);
-		cv::imshow("luminanceData", luminanceData);
+		std::vector<cv::Mat> yuv_channels = {yData, uData, vData};
+		cv::Mat yuv_image;
+		cv::merge(yuv_channels, yuv_image);
 
-		// cv::namedWindow("COLOR_YUV420p2RGB", cv::WINDOW_AUTOSIZE);
-		// cv::imshow("COLOR_YUV420p2RGB", rgb);
-		// cv::moveWindow("COLOR_YUV420p2RGB", 400, 100);
+		cv::Mat rgb_image;
+		cv::cvtColor(yuv_image, rgb_image, cv::COLOR_YUV2BGR);
 
-		// cv::imshow("uvData", uvData);
-		// cv::moveWindow("uvData", 400, 500);
+		cv::namedWindow("allData", cv::WINDOW_AUTOSIZE);
+		cv::moveWindow("allData", 100, 100);
+		cv::imshow("allData", allData);
+
+		cv::namedWindow("rgb_image", cv::WINDOW_AUTOSIZE);
+		cv::imshow("rgb_image", rgb_image);
+		cv::moveWindow("rgb_image", 400, 100);
 
 		cv::namedWindow("uData", cv::WINDOW_AUTOSIZE);
 		cv::moveWindow("uData", 1600, 600);
@@ -208,7 +208,6 @@ static void processRequest(Request *request)
 		cv::moveWindow("vData", 800, 100);
 		cv::imshow("vData", vData);
 
-		// cv::imshow("RGB Frame", rgbFrame);
 		cv::waitKey(1);
 	}
 
@@ -266,6 +265,7 @@ std::string cameraName(Camera *camera)
 
 int main()
 {
+
 	/*
 	 * --------------------------------------------------------------------
 	 * Create a Camera Manager.
@@ -284,7 +284,8 @@ int main()
 	 * There can only be a single CameraManager constructed within any
 	 * process space.
 	 */
-	std::unique_ptr<CameraManager> cm = std::make_unique<CameraManager>();
+	std::unique_ptr<CameraManager>
+		cm = std::make_unique<CameraManager>();
 	cm->start();
 
 	/*
@@ -327,6 +328,23 @@ int main()
 	std::string cameraId = cm->cameras()[0]->id();
 	camera = cm->get(cameraId);
 	camera->acquire();
+
+	ControlInfoMap camControls =
+		camera->controls();
+
+	for (auto ctr : camControls)
+	{
+		std::cout << (std::string)ctr.first->name() << ": \t" << ctr.second.toString() << std::endl;
+	}
+
+	// camera->stop();
+	// allocator->free(stream);
+	// delete allocator;
+	camera->release();
+	camera.reset();
+	cm->stop();
+
+	return 0;
 
 	/*
 	 * Stream
