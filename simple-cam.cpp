@@ -11,6 +11,7 @@
 #include <libcamera/formats.h>
 #include <libcamera/stream.h>
 #include <memory>
+#include <thread>
 
 #include <libcamera/libcamera.h>
 #include <opencv2/opencv.hpp>
@@ -20,9 +21,11 @@
 
 #define TIMEOUT_SEC 50
 #define RESOLUTION_WIDTH 640
-#define RESOLUTION_LENGTH 480
+#define RESOLUTION_HEIGHT 480
 using namespace libcamera;
 static std::shared_ptr<Camera> camera;
+static std::shared_ptr<Camera> camera2;
+
 static EventLoop loop;
 
 std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_;
@@ -176,7 +179,7 @@ static void processRequest(Request *request)
 		// int screen_width = s->width;
 		// int screen_height = s->height;
 
-		cv::Size fixedResolution(RESOLUTION_WIDTH, RESOLUTION_LENGTH);
+		cv::Size windowResolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
 		cv::Size fixedResolutionLuminance(cfg.size.height * 3 / 2, cfg.size.width);
 
 		cv::Mat allData = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
@@ -184,8 +187,8 @@ static void processRequest(Request *request)
 		cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
 		cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 
-		cv::resize(uData, uData, fixedResolution, 0, 0, cv::INTER_LINEAR);
-		cv::resize(vData, vData, fixedResolution, 0, 0, cv::INTER_LINEAR);
+		cv::resize(uData, uData, windowResolution, 0, 0, cv::INTER_LINEAR);
+		cv::resize(vData, vData, windowResolution, 0, 0, cv::INTER_LINEAR);
 
 		std::vector<cv::Mat> yuv_channels = {yData, uData, vData};
 		cv::Mat yuv_image;
@@ -193,21 +196,26 @@ static void processRequest(Request *request)
 
 		cv::Mat rgb_image;
 		cv::cvtColor(yuv_image, rgb_image, cv::COLOR_YUV2BGR);
+		cv::resize(rgb_image, rgb_image, windowResolution, 0, 0, cv::INTER_LINEAR);
 
-		cv::namedWindow("allData", cv::WINDOW_AUTOSIZE);
-		cv::moveWindow("allData", 100, 100);
-		cv::imshow("allData", allData);
+		cv::namedWindow("YUVData", cv::WINDOW_NORMAL);
+		cv::resizeWindow("YUVData", fixedResolutionLuminance.width, fixedResolutionLuminance.height);
+		cv::moveWindow("YUVData", 0, 0);
+		cv::imshow("YUVData", allData);
 
-		cv::namedWindow("rgb_image", cv::WINDOW_AUTOSIZE);
+		cv::namedWindow("rgb_image", cv::WINDOW_NORMAL);
+		cv::resizeWindow("rgb_image", windowResolution.width, windowResolution.height);
+		cv::moveWindow("rgb_image", 600, 100);
 		cv::imshow("rgb_image", rgb_image);
-		cv::moveWindow("rgb_image", 400, 100);
 
-		cv::namedWindow("uData", cv::WINDOW_AUTOSIZE);
-		cv::moveWindow("uData", 1600, 600);
+		cv::namedWindow("uData", cv::WINDOW_NORMAL);
+		cv::resizeWindow("uData", windowResolution.width, windowResolution.height);
+		cv::moveWindow("uData", 1300, 100);
 		cv::imshow("uData", uData);
 
-		cv::namedWindow("vData", cv::WINDOW_AUTOSIZE);
-		cv::moveWindow("vData", 800, 100);
+		cv::namedWindow("vData", cv::WINDOW_NORMAL);
+		cv::resizeWindow("vData", windowResolution.width, windowResolution.height);
+		cv::moveWindow("vData", 1300, 600);
 		cv::imshow("vData", vData);
 
 		cv::waitKey(1);
@@ -268,6 +276,22 @@ std::string cameraName(Camera *camera)
 
 int main()
 {
+	// Create | Resize | Move
+	// cv::Size windowResolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
+	// cv::Size fixedResolutionLuminance(windowResolution.width * 3 / 2, windowResolution.height);
+
+	// cv::namedWindow("rgb_image", cv::WINDOW_KEEPRATIO);
+	// cv::resizeWindow("rgb_image", windowResolution.width, windowResolution.height);
+	// cv::namedWindow("YUVData", cv::WINDOW_KEEPRATIO);
+	// cv::resizeWindow("YUVData", fixedResolutionLuminance.width, fixedResolutionLuminance.height);
+	// cv::moveWindow("YUVData", 100, 100);
+	// cv::moveWindow("rgb_image", 1200, 100);
+
+	// Used for a sanity check since Wayland isn't supported with the moveWindow() function
+	// cv::Mat blankImage = cv::Mat::zeros(480, 640, CV_8UC3);
+	// cv::namedWindow("Blank Image", cv::WINDOW_KEEPRATIO);
+	// cv::imshow("Blank Image", blankImage);
+	// cv::moveWindow("Blank Image", 1200, 800);
 
 	/*
 	 * --------------------------------------------------------------------
@@ -296,7 +320,7 @@ int main()
 	 * system, and list them.
 	 */
 	for (auto const &camera : cm->cameras())
-		std::cout << " - " << cameraName(camera.get()) << std::endl;
+		std::cout << "Cameras detected :" << cameraName(camera.get()) << std::endl;
 
 	/*
 	 * --------------------------------------------------------------------
@@ -329,8 +353,16 @@ int main()
 	}
 
 	std::string cameraId = cm->cameras()[0]->id();
+	std::string cameraId2 = cm->cameras()[1]->id();
+
+	std::cout << "cameraId : " << cameraId << std::endl
+			  << "cameraId2 : " << cameraId2 << std::endl;
+
 	camera = cm->get(cameraId);
+	camera2 = cm->get(cameraId2);
+
 	camera->acquire();
+	camera2->acquire();
 
 	/*
 	 * Stream
@@ -373,6 +405,8 @@ int main()
 	std::unique_ptr<CameraConfiguration> config =
 		camera->generateConfiguration({StreamRole::Viewfinder});
 
+	std::unique_ptr<CameraConfiguration> config2 =
+		camera2->generateConfiguration({StreamRole::Viewfinder});
 	/*
 	 * The CameraConfiguration contains a StreamConfiguration instance
 	 * for each StreamRole requested by the application, provided
@@ -385,6 +419,9 @@ int main()
 	std::cout << "Default viewfinder configuration is: "
 			  << streamConfig.toString() << std::endl;
 
+	StreamConfiguration &streamConfig2 = config->at(1);
+	// std::cout << "Default viewfinder configuration is: "
+	// 		  << streamConfig.toString() << std::endl;
 	// for (auto pxlFmts : streamConfig.formats().pixelformats())
 	// {
 	// 	std::cout << pxlFmts << std::endl;
@@ -423,9 +460,12 @@ int main()
 	// Additional supported formats can be found /usr/include/libcamera/libcamera/format.h
 	// streamConfig.pixelFormat = formats::YUYV; // 'Column striations'
 	streamConfig.pixelFormat = formats::YUV420; // Results in grayscale w/o striations
-
 	streamConfig.size.width = RESOLUTION_WIDTH;
-	streamConfig.size.height = RESOLUTION_LENGTH;
+	streamConfig.size.height = RESOLUTION_HEIGHT;
+
+	streamConfig2.pixelFormat = formats::YUV420; // Results in grayscale w/o striations
+	streamConfig2.size.width = RESOLUTION_WIDTH;
+	streamConfig2.size.height = RESOLUTION_HEIGHT;
 
 	/*
 	 * Each StreamConfiguration parameter which is part of a
@@ -460,6 +500,7 @@ int main()
 	 * requested.
 	 */
 	config->validate();
+	config2->validate();
 	std::cout << "Validated viewfinder configuration is: "
 			  << streamConfig.toString() << std::endl;
 
@@ -468,6 +509,7 @@ int main()
 	 * Camera.
 	 */
 	camera->configure(config.get());
+	camera2->configure(config2.get());
 
 	/*
 	 * --------------------------------------------------------------------
@@ -593,6 +635,13 @@ int main()
 	 * Camera::requestCompleted Signal is called.
 	 */
 	camera->start();
+
+	// ATTEMPTS FOR GETTING THREADID() WERE MADE HERE 8/12/24
+	// Thread &thread = *camera->thread();
+	// pid_t test = camera->thread();
+	//  pid_t camThreadId = camera->thread().currentId(); // the current thread this object is bound to
+	//   camera->moveToThread(Thread *thread); //move camera object to a different thread
+
 	for (std::unique_ptr<Request> &request : requests)
 		camera->queueRequest(request.get());
 

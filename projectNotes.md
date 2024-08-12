@@ -1,4 +1,6 @@
 # Things to do/try out
+- Figure out why windows aren't displaying the resolution that's hardcoded into the program
+- Have both camera feeds running on seperate threads
 - Having the YUV imshow()'s display windows to act consistently
   - U/V channels are fine
   - Y isn't
