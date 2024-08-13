@@ -22,20 +22,27 @@ INCLUDES = -I. $(LIBCAMERA_CFLAGS) $(LIBEVENT_CFLAGS) $(OPENCV_CFLAGS) \
 LIBS = $(LIBCAMERA_LIBS) $(LIBEVENT_LIBS) $(OPENCV_LIBS)
 
 # Source files
-SRCS = simple-cam.cpp event_loop.cpp image.cpp
+COMMON_SRCS = event_loop.cpp image.cpp
+SIMPLE_CAM_SRCS = simple-cam.cpp $(COMMON_SRCS)
+DUAL_CAM_SRCS = dual-camera.cpp $(COMMON_SRCS)
 
-# Output executable
+# Output executables
 TARGET = simple-cam
+TARGET2 = dual-cam
 
 # Default target
-all: $(TARGET)
+all: $(TARGET) $(TARGET2)
 
-# Link object files to create executable
-$(TARGET): $(SRCS)
+# Link object files to create executables
+$(TARGET): $(SIMPLE_CAM_SRCS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+# $@ = name of target file
+# $  = represents all prerequisites/dependencies of target
+$(TARGET2): $(DUAL_CAM_SRCS)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
 
 # Clean up
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(TARGET2)
 
 .PHONY: all clean
