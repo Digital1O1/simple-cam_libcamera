@@ -195,19 +195,19 @@ static void processRequest(Request *request)
 		cv::cvtColor(yuv_image, rgb_image, cv::COLOR_YUV2BGR);
 
 		cv::namedWindow("allData", cv::WINDOW_AUTOSIZE);
-		cv::moveWindow("allData", 100, 100);
+		cv::moveWindow("allData", 0, 150);
 		cv::imshow("allData", allData);
 
 		cv::namedWindow("rgb_image", cv::WINDOW_AUTOSIZE);
 		cv::imshow("rgb_image", rgb_image);
-		cv::moveWindow("rgb_image", 400, 100);
+		cv::moveWindow("rgb_image", 650, 300);
 
 		cv::namedWindow("uData", cv::WINDOW_AUTOSIZE);
-		cv::moveWindow("uData", 1600, 600);
+		cv::moveWindow("uData", 1300, 50);
 		cv::imshow("uData", uData);
 
 		cv::namedWindow("vData", cv::WINDOW_AUTOSIZE);
-		cv::moveWindow("vData", 800, 100);
+		cv::moveWindow("vData", 1300, 600);
 		cv::imshow("vData", vData);
 
 		cv::waitKey(1);
@@ -594,10 +594,28 @@ int main()
 	 * For each delivered frame, the Slot connected to the
 	 * Camera::requestCompleted Signal is called.
 	 */
-	camera->start();
-	for (std::unique_ptr<Request> &request : requests)
-		camera->queueRequest(request.get());
 
+	// Should return 0 if camera is started
+	if (camera->start())
+	{
+		std::cout << "Camera not started\n\n";
+		return EXIT_FAILURE;
+	}
+	else
+	{
+		std::cout << "\n\n-------------------- [ CAMERA STARTED] --------------------\n\n";
+	}
+	for (std::unique_ptr<Request> &request : requests)
+	{
+		// Should return 0 if everything is okay
+		if (camera->queueRequest(request.get()))
+		{
+			std::cout << "Queue request denied\n\n";
+			return EXIT_FAILURE;
+		}
+		// std::cout << "Request : " << camera->queueRequest(request.get()) << std::endl;
+	}
+	// camera->queueRequest(request.get());
 	/*
 	 * --------------------------------------------------------------------
 	 * Run an EventLoop

@@ -1,10 +1,8 @@
 # Things to do/try out
-- Figure out why windows aren't displaying the resolution that's hardcoded into the program
-- Have both camera feeds running on seperate threads
-- Having the YUV imshow()'s display windows to act consistently
-  - U/V channels are fine
-  - Y isn't
-- Read up on Rec709/601
+- Just get two camera video feeds going
+  - Double static void processRequest(Request *request)
+  - Add `cameraID` parameter to also be passed into it
+
 
 
 # Useful references 

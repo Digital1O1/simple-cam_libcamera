@@ -47,14 +47,17 @@ std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_;
 
 static void processRequest(Request *request);
 
+// Duplicate this
 static void requestComplete(Request *request)
 {
     if (request->status() == Request::RequestCancelled)
         return;
 
+    // Add camera parameter at end
     loop.callLater(std::bind(&processRequest, request));
 }
 
+// Add camera parameter
 static void processRequest(Request *request)
 {
     std::cout << std::endl
@@ -132,7 +135,16 @@ static void processRequest(Request *request)
          * must be mapped by the application
          *
          */
+        /*
+            To do
+                - Fix me
+                - Determine if camera 0 or 1 being used
+                    - If camera 1 add +4 to buffer ?????????
+        */
+        std::cout << "Camera ID : " << camera0->id() << std::endl;
+        std::cout << "Camera ID2 : " << camera1->id() << std::endl;
 
+        std::cin.get();
         Image *img = mappedBuffers_[buffer].get();
         const libcamera::ColorSpace &colorSpace = libcamera::ColorSpace(cfg.colorSpace.value());
         std::string colorSpaceStr = colorSpace.toString();
@@ -528,6 +540,7 @@ int main()
      */
     config->validate();
     config2->validate();
+
     std::cout << "\n\nValidated viewfinder AFTER configuration is for CAMERA 0: "
               << streamConfig.toString() << std::endl;
     std::cout << "Validated viewfinder AFTER configuration is for CAMERA 1: "
@@ -641,7 +654,7 @@ int main()
         {
             std::unique_ptr<Image> image = Image::fromFrameBuffer(buffer.get(), Image::MapMode::ReadOnly);
             assert(image != nullptr);
-            mappedBuffers_[buffer.get()] = std::move(image);
+            mappedBuffers_[buffer.get() + 4] = std::move(image);
         }
     }
 
@@ -700,23 +713,23 @@ int main()
     }
 
     // Camera 1
-    Stream *stream2 = streamConfig.stream();
-    const std::vector<std::unique_ptr<FrameBuffer>> &buffers2 = allocator->buffers(stream2);
+    Stream *stream2 = streamConfig2.stream();
+    const std::vector<std::unique_ptr<FrameBuffer>> &buffers2 = allocator2->buffers(stream2);
     std::vector<std::unique_ptr<Request>> requests2;
     for (unsigned int i = 0; i < buffers2.size(); ++i)
     {
         std::unique_ptr<Request> request = camera1->createRequest();
         if (!request)
         {
-            std::cerr << "Can't create request" << std::endl;
+            std::cerr << "Can't create request for camera 1" << std::endl;
             return EXIT_FAILURE;
         }
 
         const std::unique_ptr<FrameBuffer> &buffer = buffers2[i];
-        int ret = request->addBuffer(stream, buffer.get());
+        int ret = request->addBuffer(stream2, buffer.get());
         if (ret < 0)
         {
-            std::cerr << "Can't set buffer for request"
+            std::cerr << "Can't set buffer for camera 1 request"
                       << std::endl;
             return EXIT_FAILURE;
         }
@@ -724,14 +737,20 @@ int main()
         // {
         //     std::cout << "Buffer set for camera 1" << std::endl;
         // }
+
         /*
          * Controls can be added to a request on a per frame basis.
          */
         ControlList &controls = request->controls();
         // controls.set(controls::Brightness, 0.5); // This was here orignally
         controls.set(controls::AE_ENABLE, true);
-        requests.push_back(std::move(request));
+        requests2.push_back(std::move(request));
     }
+    std::cout << "\nRequests1 size after push_back : " << requests.size() << std::endl;
+    std::cout << "Requests2 size after push_back : " << requests2.size() << std::endl;
+    // std::cout << "buffers : " << buffers.size() << std::endl;
+    // std::cout << "buffers2 : " << buffers2.size() << std::endl;
+    // std::cin.get();
 
     /*
      * --------------------------------------------------------------------
@@ -766,19 +785,30 @@ int main()
      * For each delivered frame, the Slot connected to the
      * Camera::requestCompleted Signal is called.
      */
-    camera0->start();
-    camera1->start();
+    // std::cout << "Camera0 : " << camera0->start() << std::endl;
+    // std::cout << "Camera1 : " << camera1->start() << std::endl;
 
-    // ATTEMPTS FOR GETTING THREADID() WERE MADE HERE 8/12/24
-    // Thread &thread = *camera->thread();
-    // pid_t test = camera->thread();
-    //  pid_t camThreadId = camera->thread().currentId(); // the current thread this object is bound to
-    //   camera->moveToThread(Thread *thread); //move camera object to a different thread
+    // if (!(camera0->start()) && !(camera1->start()))
+    if (camera0->start() < 0 || camera1->start() < 0)
+    {
+        std::cout << "Cameras not started\n\n";
+        return EXIT_FAILURE;
+    }
+
+    // std::cout << "Requests1 size after push_back: " << requests.size() << std::endl;
+    // std::cout << "Requests2 size after push_back: " << requests2.size() << std::endl;
+    std::cout << std::endl;
 
     for (std::unique_ptr<Request> &request : requests)
-        camera0->queueRequest(request.get());
-    for (std::unique_ptr<Request> &request : requests)
-        camera1->queueRequest(request.get());
+    {
+        std::cout << "Camera0 request : " << camera0->queueRequest(request.get()) << std::endl;
+    }
+    std::cout << std::endl;
+    for (std::unique_ptr<Request> &request : requests2)
+    {
+        // queueRequest() should return 0
+        std::cout << "Camera1 request : " << camera1->queueRequest(request.get()) << std::endl;
+    }
 
     /*
      * --------------------------------------------------------------------
@@ -789,8 +819,8 @@ int main()
      */
     loop.timeout(TIMEOUT_SEC);
     int ret = loop.exec();
-    std::cout << "Capture ran for " << TIMEOUT_SEC << " seconds and "
-              << "stopped with exit status: " << ret << std::endl;
+    std::cout << "Capture ran for [ " << TIMEOUT_SEC << " ] seconds and "
+              << "stopped with exit status : " << ret << std::endl;
 
     /*
      * --------------------------------------------------------------------

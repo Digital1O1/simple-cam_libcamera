@@ -35,7 +35,8 @@ int EventLoop::exec()
 	exitCode_ = -1;
 	exit_.store(false, std::memory_order_release);
 
-	while (!exit_.load(std::memory_order_acquire)) {
+	while (!exit_.load(std::memory_order_acquire))
+	{
 		dispatchCalls();
 		event_base_loop(event_, EVLOOP_NO_EXIT_ON_EMPTY);
 	}
@@ -54,7 +55,6 @@ void EventLoop::interrupt()
 {
 	event_base_loopbreak(event_);
 }
-
 
 void EventLoop::timeoutTriggered(int fd, short event, void *arg)
 {
@@ -87,7 +87,8 @@ void EventLoop::dispatchCalls()
 {
 	std::unique_lock<std::mutex> locker(lock_);
 
-	for (auto iter = calls_.begin(); iter != calls_.end(); ) {
+	for (auto iter = calls_.begin(); iter != calls_.end();)
+	{
 		std::function<void()> call = std::move(*iter);
 
 		iter = calls_.erase(iter);

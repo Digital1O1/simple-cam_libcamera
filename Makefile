@@ -14,6 +14,7 @@ OPENCV_CFLAGS = $(shell $(PKG_CONFIG) --cflags opencv4)
 OPENCV_LIBS = $(shell $(PKG_CONFIG) --libs opencv4)
 
 # Include directories
+# The '.' tells the compiler to include the current directory in the list of directories to search for the header files
 INCLUDES = -I. $(LIBCAMERA_CFLAGS) $(LIBEVENT_CFLAGS) $(OPENCV_CFLAGS) \
            -I/home/pi/libcamera/include/linux \
            -I/usr/include
