@@ -28,11 +28,11 @@ public:
 
 class MotorCycle : public Vehicle
 {
-    private:
+private:
     String brand;
 
-    public:
-        // Set constructor
+public:
+    // Set constructor
 };
 
 // Derived Class: Car
@@ -46,18 +46,18 @@ public:
         Notes about constructor
             - Initialization list
                 - The part after the colon :
-                - Used to initialize base class members and data members before the body of the constructor is executed 
+                - Used to initialize base class members and data members before the body of the constructor is executed
             - Vehicle(brand, speed)
-                - Calls the constructor of the base class 'Vehicle' 
+                - Calls the constructor of the base class 'Vehicle'
                 - Passes 'brand'/'speed' parameters to it
                 - This is done to ensure the base class part of `Car` object is properly initialized
             - doors(doors)
                 - Initializes 'doors' member of the 'Car' class with the value passed to the constructor
-            - Base class initialization 
-                - When having a derived class like `car` 
-                    - The base class `Vehicle` constructor is called BEFORe the derived class's constructor body is executed 
+            - Base class initialization
+                - When having a derived class like `car`
+                    - The base class `Vehicle` constructor is called BEFORe the derived class's constructor body is executed
                     - The Vehicle constructor is called with brand and speed first.
-                    - After the Vehicle constructor completes, 
+                    - After the Vehicle constructor completes,
                         - The Car constructor continues with the initialization of doors.
                 - Ensures that all parts of the object are fully initialized before any other operations are performed.
     */
@@ -71,7 +71,7 @@ public:
     // const = so the state doesn't change
     // override = ensures display() method is correctly overriding the base class's virtual method
     // It's used to indicate that a member function in a derived class is to override a virtual function in the base class
-    // This helps the compiler check if you're correctly overriding a base class method, catching errors if the base method's signature doesn't match 
+    // This helps the compiler check if you're correctly overriding a base class method, catching errors if the base method's signature doesn't match
     void display() const override
     {
         std::cout << "Car Brand: " << brand << std::endl;
