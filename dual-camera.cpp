@@ -29,6 +29,7 @@ static std::shared_ptr<Camera> camera1;
 static EventLoop loop;
 
 std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_;
+std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_2;
 
 /*
  * --------------------------------------------------------------------
@@ -53,11 +54,18 @@ static void requestComplete(Request *request)
     if (request->status() == Request::RequestCancelled)
         return;
 
-    // Add camera parameter at end
     loop.callLater(std::bind(&processRequest, request));
 }
+// static void requestComplete2(Request *request, Camera *camera)
+// {
+//     if (request->status() == Request::RequestCancelled)
+//         return;
 
-// Add camera parameter
+//     // Add camera parameter at end
+//     loop.callLater(std::bind(&processRequest, request, camera));
+// }
+
+// Add camera ID parameter to be passed into processRequest
 static void processRequest(Request *request)
 {
     std::cout << std::endl
@@ -141,32 +149,42 @@ static void processRequest(Request *request)
                 - Determine if camera 0 or 1 being used
                     - If camera 1 add +4 to buffer ?????????
         */
-        std::cout << "Camera ID : " << camera0->id() << std::endl;
+
+        std::cout << "\nCamera ID : " << camera0->id() << std::endl;
         std::cout << "Camera ID2 : " << camera1->id() << std::endl;
 
-        std::cin.get();
+        // std::cin.get();
         Image *img = mappedBuffers_[buffer].get();
-        const libcamera::ColorSpace &colorSpace = libcamera::ColorSpace(cfg.colorSpace.value());
-        std::string colorSpaceStr = colorSpace.toString();
+        Image *img_ = mappedBuffers_[buffer].get();
 
-        std::cout << "\n --------------------------- [DEBUG INFORMATION ]---------------------------" << std::endl;
-        std::cout << "\n"
-                  << "Resolution" << " : " << cfg.size.width << " x " << cfg.size.height << std::endl;
-        std::cout << "Number of bytes in each line of image buffer " << " : " << cfg.stride << std::endl;
-        std::cout << "pixelFormat" << " : " << cfg.pixelFormat << std::endl;
-        std::cout << "img->numPlanes() : " << img->numPlanes() << std::endl;
-        std::cout << "Color Space : " << colorSpaceStr << std::endl;                                                                          // sYCC
-        std::cout << "colorSpace.Primaries : " << (int)libcamera::ColorSpace::Primaries(colorSpace.primaries) << std::endl;                   // Rec709
-        std::cout << "colorSpace.TransferFunction : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.transferFunction) << std::endl; // Srgb
-        std::cout << "colorSpace.ycbcrEncoding : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.ycbcrEncoding) << std::endl;       // Rec601
-        std::cout << "colorSpace.Range : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.range) << std::endl;                       // Full
+        // const libcamera::ColorSpace &colorSpace = libcamera::ColorSpace(cfg.colorSpace.value());
+        // std::string colorSpaceStr = colorSpace.toString();
 
-        std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
+        // std::cout << "\n --------------------------- [DEBUG INFORMATION ]---------------------------" << std::endl;
+        // std::cout << "\n"
+        //           << "Resolution" << " : " << cfg.size.width << " x " << cfg.size.height << std::endl;
+        // std::cout << "Number of bytes in each line of image buffer " << " : " << cfg.stride << std::endl;
+        // std::cout << "pixelFormat" << " : " << cfg.pixelFormat << std::endl;
+        // std::cout << "img->numPlanes() : " << img->numPlanes() << std::endl;
+        // std::cout << "Color Space : " << colorSpaceStr << std::endl;                                                                          // sYCC
+        // std::cout << "colorSpace.Primaries : " << (int)libcamera::ColorSpace::Primaries(colorSpace.primaries) << std::endl;                   // Rec709
+        // std::cout << "colorSpace.TransferFunction : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.transferFunction) << std::endl; // Srgb
+        // std::cout << "colorSpace.ycbcrEncoding : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.ycbcrEncoding) << std::endl;       // Rec601
+        // std::cout << "colorSpace.Range : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.range) << std::endl;                       // Full
 
-        // std::cout << "img : " << img << std::endl;
+        // std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
+
+        std::cout << "img  : " << img << std::endl;
+        std::cout << "img_ : " << img_ << std::endl;
 
         uint8_t *ptr = (uint8_t *)img->data(0).data();
-        // std::cout << "ptr : " << &ptr << std::endl;
+        uint8_t *ptr2 = (uint8_t *)img_->data(0).data();
+
+        std::cout << "ptr : " << &ptr << std::endl;
+        std::cout << "ptr2 : " << &ptr2 << std::endl;
+
+        // std::cin.get();
+
         /*
             cv::Mat(int rows,int cols,int type, void *data, size_t step)
             rows
@@ -194,45 +212,77 @@ static void processRequest(Request *request)
         // int screen_width = s->width;
         // int screen_height = s->height;
 
-        cv::Size windowResolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
-        cv::Size fixedResolutionLuminance(cfg.size.height * 3 / 2, cfg.size.width);
+        // cv::Size windowResolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
+        // cv::Size fixedResolutionLuminance(cfg.size.height * 3 / 2, cfg.size.width);
 
-        cv::Mat allData = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
-        cv::Mat yData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
-        cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
-        cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
+        // // Camera0
+        // cv::Mat allData = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
+        // cv::Mat yData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
+        // cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
+        // cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 
-        cv::resize(uData, uData, windowResolution, 0, 0, cv::INTER_LINEAR);
-        cv::resize(vData, vData, windowResolution, 0, 0, cv::INTER_LINEAR);
+        // Camera1
+        // cv::Mat allData2 = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr2, cfg.stride);
+        // cv::Mat yData2 = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr2, cfg.stride);
+        // cv::Mat uData2 = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr2 + cfg.size.width * cfg.size.height);
+        // cv::Mat vData2 = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr2 + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 
-        std::vector<cv::Mat> yuv_channels = {yData, uData, vData};
-        cv::Mat yuv_image;
-        cv::merge(yuv_channels, yuv_image);
+        // Camera0
+        // cv::resize(uData, uData, windowResolution, 0, 0, cv::INTER_LINEAR);
+        // cv::resize(vData, vData, windowResolution, 0, 0, cv::INTER_LINEAR);
 
-        cv::Mat rgb_image;
+        // Camera1
+        // cv::resize(uData2, uData2, windowResolution, 0, 0, cv::INTER_LINEAR);
+        // cv::resize(vData2, vData2, windowResolution, 0, 0, cv::INTER_LINEAR);
 
-        cv::cvtColor(yuv_image, rgb_image, cv::COLOR_YUV2BGR);
-        cv::resize(rgb_image, rgb_image, windowResolution, 0, 0, cv::INTER_LINEAR);
+        // Camera0
+        // std::vector<cv::Mat> yuv_channels = {yData, uData, vData};
+        // cv::Mat yuv_image;
+        // cv::merge(yuv_channels, yuv_image);
 
-        cv::namedWindow("YUVData", cv::WINDOW_NORMAL);
-        cv::resizeWindow("YUVData", fixedResolutionLuminance.width, fixedResolutionLuminance.height);
-        cv::moveWindow("YUVData", 0, 0);
-        cv::imshow("YUVData", allData);
+        // Camera1
+        // std::vector<cv::Mat> yuv_channels2 = {yData2, uData2, vData2};
+        // cv::Mat yuv_image2;
+        // cv::merge(yuv_channels2, yuv_image2);
 
-        cv::namedWindow("rgb_image", cv::WINDOW_NORMAL);
-        cv::resizeWindow("rgb_image", windowResolution.width, windowResolution.height);
-        cv::moveWindow("rgb_image", 600, 100);
-        cv::imshow("rgb_image", rgb_image);
+        // cv::Mat rgb_image;
+        //  cv::Mat rgb_image2;
 
-        cv::namedWindow("uData", cv::WINDOW_NORMAL);
-        cv::resizeWindow("uData", windowResolution.width, windowResolution.height);
-        cv::moveWindow("uData", 1300, 100);
-        cv::imshow("uData", uData);
+        // cv::cvtColor(yuv_image, rgb_image, cv::COLOR_YUV2BGR);
+        // cv::resize(rgb_image, rgb_image, windowResolution, 0, 0, cv::INTER_LINEAR);
 
-        cv::namedWindow("vData", cv::WINDOW_NORMAL);
-        cv::resizeWindow("vData", windowResolution.width, windowResolution.height);
-        cv::moveWindow("vData", 1300, 600);
-        cv::imshow("vData", vData);
+        // cv::cvtColor(yuv_image2, rgb_image2, cv::COLOR_YUV2BGR);
+        // cv::resize(rgb_image2, rgb_image2, windowResolution, 0, 0, cv::INTER_LINEAR);
+
+        // cv::namedWindow("YUVData", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("YUVData", fixedResolutionLuminance.width, fixedResolutionLuminance.height);
+        // cv::moveWindow("YUVData", 0, 0);
+        // cv::imshow("YUVData", allData);
+
+        // cv::namedWindow("rgb_image", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("rgb_image", windowResolution.width, windowResolution.height);
+        // cv::moveWindow("rgb_image", 600, 100);
+        // cv::imshow("rgb_image", rgb_image);
+
+        // cv::namedWindow("uData", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("uData", windowResolution.width, windowResolution.height);
+        // cv::moveWindow("uData", 1300, 100);
+        // cv::imshow("uData", uData);
+
+        // cv::namedWindow("vData", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("vData", windowResolution.width, windowResolution.height);
+        // cv::moveWindow("vData", 1300, 600);
+        // cv::imshow("vData", vData);
+
+        // cv::namedWindow("rgb_image", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("rgb_image", windowResolution.width, windowResolution.height);
+        // cv::moveWindow("rgb_image", 0, 100);
+        // cv::imshow("rgb_image", rgb_image);
+
+        // cv::namedWindow("rgb_image2", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("rgb_image2", windowResolution.width, windowResolution.height);
+        // cv::moveWindow("rgb_image2", 600, 100);
+        // cv::imshow("rgb_image2", rgb_image2);
 
         cv::waitKey(1);
     }
@@ -240,6 +290,7 @@ static void processRequest(Request *request)
     /* Re-queue the Request to the camera. */
     request->reuse(Request::ReuseBuffers);
     camera0->queueRequest(request);
+    camera1->queueRequest(request);
 }
 
 /*
@@ -385,7 +436,7 @@ int main()
     camera1->acquire();
 
     std::cout << "Camera 0 ID : " << cameraId << std::endl
-              << "Camera 1 ID  : " << cameraId2 << std::endl
+              << "Camera 1 ID : " << cameraId2 << std::endl
               << std::endl;
 
     /*
@@ -637,7 +688,6 @@ int main()
     for (StreamConfiguration &cfg : *config2)
     {
         int ret = allocator2->allocate(cfg.stream());
-        // int ret2 = allocator2->allocate(cfg.stream());
 
         if (ret < 0)
         {
@@ -748,6 +798,7 @@ int main()
     }
     std::cout << "\nRequests1 size after push_back : " << requests.size() << std::endl;
     std::cout << "Requests2 size after push_back : " << requests2.size() << std::endl;
+
     // std::cout << "buffers : " << buffers.size() << std::endl;
     // std::cout << "buffers2 : " << buffers2.size() << std::endl;
     // std::cin.get();
@@ -771,6 +822,7 @@ int main()
      * applications shall connect a Slot to the Camera 'requestCompleted'
      * Signal before the camera is started.
      */
+
     camera0->requestCompleted.connect(requestComplete);
     camera1->requestCompleted.connect(requestComplete);
 
