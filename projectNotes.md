@@ -2,6 +2,11 @@
 - Just get two camera video feeds going
   - Double static void processRequest(Request *request)
   - Add `cameraID` parameter to also be passed into it
+- QT related stuff
+  - Install QT dev tools : `sudo apt-get install qt6-base-dev-tools`
+  - Verify using : `which moc`
+    - Add to PATH if needed : `export PATH=/usr/lib/qt6/bin:$PATH`
+
 
 
 
