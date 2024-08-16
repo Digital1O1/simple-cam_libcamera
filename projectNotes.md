@@ -21,7 +21,7 @@
 
 
 
-# Things to read 
+# Things to read/review 
 - https://stackoverflow.com/questions/27822017/planar-yuv420-data-layout
 - [2.7.1.2. Planar YUV formats](https://docs.kernel.org/userspace-api/media/v4l/pixfmt-yuv-planar.html)
 - [YcbcrEncoding](https://libcamera.org/api-html/classlibcamera_1_1ColorSpace.html)
@@ -89,3 +89,64 @@ ptr_V = ptr + 1,152,000 bytes
 +-----------------------------------+
 ```
 
+---
+
+### [Labmada functions](https://learn.microsoft.com/en-us/cpp/cpp/lambda-expressions-in-cpp?view=msvc-170)
+
+```cpp
+// Lambda functions used in this scope of the project
+static void requestComplete(Request *request)
+{
+    if (request->status() == Request::RequestCancelled)
+        return;
+
+    // std::string cameraID = camera0->id();
+    int cameraID = 0;
+
+    loop.callLater([request, cameraID]()
+                   { processRequest(request, cameraID); });
+}
+
+static void requestComplete2(Request *request)
+{
+    if (request->status() == Request::RequestCancelled)
+        return;
+
+    // std::string cameraID = camera1->id();
+    int cameraID = 1;
+    loop.callLater([request, cameraID]()
+                   { processRequest(request, cameraID); });
+}
+```
+- What is a `Lambda function`?
+  - A convenient way of defining an anonymous function object right on the spot where `it needs to be invoked` or `passed as a argument to a function`
+    - `Function object` : An object that can be used as if it were a function
+  - Typical lambda implmentation
+    - Used to encapsulate a few lines of code that are `passed to an algorithm` or `asynchronous functions`
+```cpp
+// Syntax 
+[ capture_clause ] ( parameters ) -> return_type {
+    // function body
+}
+
+static void requestComplete2(Request *request)
+{
+    if (request->status() == Request::RequestCancelled)
+        return;
+    // std::string cameraID = camera1->id();
+    int cameraID = 1;
+    loop.callLater([request, cameraID]()
+                   { processRequest(request, cameraID); });
+}
+```
+- Capture clause
+  - Tells lambda which variable from the surrounding scope it should capture/use
+  - Anything included in the brackets the lambda function `has access`
+    - If left empty, the lambda has `no access` to the outside variables
+- Parameters 
+  - The input(s) to the lambda function
+- Return type
+  - Specifies the type of value the lambda function will return
+  - C++ typically infers the return type so it's really not needed
+- Function body
+  - The code the lambda will execute

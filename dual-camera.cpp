@@ -18,6 +18,7 @@
 #include "image.h"
 #include "event_loop.h"
 #include <X11/Xlib.h>
+#include <string>
 
 #define TIMEOUT_SEC 50
 #define RESOLUTION_WIDTH 640
@@ -25,9 +26,23 @@
 using namespace libcamera;
 static std::shared_ptr<Camera> camera0;
 static std::shared_ptr<Camera> camera1;
-
+Image *img;
 static EventLoop loop;
 
+/*
+    notes about mappedBuffers_
+        - std::map
+            - Stores elements as key-value pairs
+            - Keys are unique
+            - Elements automatically sorted based on keys
+            - key-value paris organized so that searching/inersting/deleting elements are fast
+        - libcamera::Framebuffer *
+            - The keys in this map are pointers to the 'libcamera::FrameBuffer' objects
+        - std::unique_ptr<Image>
+            - values in this map are `std::unique_ptr` objects that manage the dynamic memory for `Image` objects
+            - `std::unique_ptr` is a smart pointer that makes sure a single owner for the dynamically allocated `Image` object
+            - When the unique pointer goes out of scope it'll delete the Image object to prevent memeory leaks
+*/
 std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_;
 std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_2;
 
@@ -46,7 +61,7 @@ std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_2;
  * The Slot receives the Request as a parameter.
  */
 
-static void processRequest(Request *request);
+static void processRequest(Request *request, int cameraID);
 
 // Duplicate this
 static void requestComplete(Request *request)
@@ -54,20 +69,30 @@ static void requestComplete(Request *request)
     if (request->status() == Request::RequestCancelled)
         return;
 
-    loop.callLater(std::bind(&processRequest, request));
-}
-// static void requestComplete2(Request *request, Camera *camera)
-// {
-//     if (request->status() == Request::RequestCancelled)
-//         return;
+    // std::string cameraID = camera0->id();
+    int cameraID = 0;
 
-//     // Add camera parameter at end
-//     loop.callLater(std::bind(&processRequest, request, camera));
-// }
+    loop.callLater([request, cameraID]()
+                   { processRequest(request, cameraID); });
+}
+
+static void requestComplete2(Request *request)
+{
+    if (request->status() == Request::RequestCancelled)
+        return;
+
+    // std::string cameraID = camera1->id();
+    int cameraID = 1;
+    loop.callLater([request, cameraID]()
+                   { processRequest(request, cameraID); });
+}
 
 // Add camera ID parameter to be passed into processRequest
-static void processRequest(Request *request)
+// static void processRequest(Request *request)
+static void processRequest(Request *request, int cameraID)
+
 {
+    std::cout << "Process request from Camera : [ " << cameraID << " ]\n";
     std::cout << std::endl
               << "Request completed: " << request->toString() << std::endl;
 
@@ -116,6 +141,7 @@ static void processRequest(Request *request)
         const FrameMetadata &metadata = buffer->metadata();
 
         /* Print some information about the buffer which has completed. */
+        // Segmentation fault with camera1 is somewhere in here 8/16/24
         std::cout << " seq: " << std::setw(6) << std::setfill('0') << metadata.sequence
                   << " timestamp: " << metadata.timestamp
                   << " bytesused: ";
@@ -150,12 +176,24 @@ static void processRequest(Request *request)
                     - If camera 1 add +4 to buffer ?????????
         */
 
-        std::cout << "\nCamera ID : " << camera0->id() << std::endl;
-        std::cout << "Camera ID2 : " << camera1->id() << std::endl;
+        // std::cout << "\nCamera ID : " << camera0->id() << std::endl;
+        // std::cout << "Camera ID2 : " << camera1->id() << std::endl;
+
+        img = mappedBuffers_[buffer].get();
 
         // std::cin.get();
-        Image *img = mappedBuffers_[buffer].get();
-        Image *img_ = mappedBuffers_[buffer].get();
+        // if (cameraID == 0)
+        // {
+        //     img = mappedBuffers_[buffer].get();
+        //     std::cout << "\nCamera0 img  : " << img << std::endl;
+        // }
+        // else
+        // {
+        //     img = mappedBuffers_[buffer].get();
+        //     std::cout << "\nCamera1 img  : " << img << std::endl;
+        //}
+        // Image *img = mappedBuffers_[buffer].get();
+        //  Image *img_ = mappedBuffers_[buffer].get();
 
         // const libcamera::ColorSpace &colorSpace = libcamera::ColorSpace(cfg.colorSpace.value());
         // std::string colorSpaceStr = colorSpace.toString();
@@ -174,14 +212,14 @@ static void processRequest(Request *request)
 
         // std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
 
-        std::cout << "img  : " << img << std::endl;
-        std::cout << "img_ : " << img_ << std::endl;
+        // std::cout << "img  : " << img << std::endl;
+        //  std::cout << "img_ : " << img_ << std::endl;
 
         uint8_t *ptr = (uint8_t *)img->data(0).data();
-        uint8_t *ptr2 = (uint8_t *)img_->data(0).data();
+        // uint8_t *ptr2 = (uint8_t *)img_->data(0).data();
 
-        std::cout << "ptr : " << &ptr << std::endl;
-        std::cout << "ptr2 : " << &ptr2 << std::endl;
+        std::cout << "\nptr : " << &ptr << std::endl;
+        // std::cout << "ptr2 : " << &ptr2 << std::endl;
 
         // std::cin.get();
 
@@ -221,38 +259,18 @@ static void processRequest(Request *request)
         // cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
         // cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 
-        // Camera1
-        // cv::Mat allData2 = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr2, cfg.stride);
-        // cv::Mat yData2 = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr2, cfg.stride);
-        // cv::Mat uData2 = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr2 + cfg.size.width * cfg.size.height);
-        // cv::Mat vData2 = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr2 + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
-
-        // Camera0
         // cv::resize(uData, uData, windowResolution, 0, 0, cv::INTER_LINEAR);
         // cv::resize(vData, vData, windowResolution, 0, 0, cv::INTER_LINEAR);
 
-        // Camera1
-        // cv::resize(uData2, uData2, windowResolution, 0, 0, cv::INTER_LINEAR);
-        // cv::resize(vData2, vData2, windowResolution, 0, 0, cv::INTER_LINEAR);
-
-        // Camera0
         // std::vector<cv::Mat> yuv_channels = {yData, uData, vData};
         // cv::Mat yuv_image;
         // cv::merge(yuv_channels, yuv_image);
-
-        // Camera1
-        // std::vector<cv::Mat> yuv_channels2 = {yData2, uData2, vData2};
-        // cv::Mat yuv_image2;
-        // cv::merge(yuv_channels2, yuv_image2);
 
         // cv::Mat rgb_image;
         //  cv::Mat rgb_image2;
 
         // cv::cvtColor(yuv_image, rgb_image, cv::COLOR_YUV2BGR);
         // cv::resize(rgb_image, rgb_image, windowResolution, 0, 0, cv::INTER_LINEAR);
-
-        // cv::cvtColor(yuv_image2, rgb_image2, cv::COLOR_YUV2BGR);
-        // cv::resize(rgb_image2, rgb_image2, windowResolution, 0, 0, cv::INTER_LINEAR);
 
         // cv::namedWindow("YUVData", cv::WINDOW_NORMAL);
         // cv::resizeWindow("YUVData", fixedResolutionLuminance.width, fixedResolutionLuminance.height);
@@ -274,23 +292,45 @@ static void processRequest(Request *request)
         // cv::moveWindow("vData", 1300, 600);
         // cv::imshow("vData", vData);
 
-        // cv::namedWindow("rgb_image", cv::WINDOW_NORMAL);
-        // cv::resizeWindow("rgb_image", windowResolution.width, windowResolution.height);
-        // cv::moveWindow("rgb_image", 0, 100);
-        // cv::imshow("rgb_image", rgb_image);
-
-        // cv::namedWindow("rgb_image2", cv::WINDOW_NORMAL);
-        // cv::resizeWindow("rgb_image2", windowResolution.width, windowResolution.height);
-        // cv::moveWindow("rgb_image2", 600, 100);
-        // cv::imshow("rgb_image2", rgb_image2);
-
         cv::waitKey(1);
     }
 
     /* Re-queue the Request to the camera. */
     request->reuse(Request::ReuseBuffers);
-    camera0->queueRequest(request);
-    camera1->queueRequest(request);
+    // std::cout << "\nCamera0 request : " << camera0->queueRequest(request) << std::endl;
+    // std::cout << "Camera1 request : " << camera1->queueRequest(request) << std::endl;
+
+    // camera1->queueRequest(request);
+
+    // std::cout << "Printing out enums " << ENODEV << " " << EACCES << " " << EXDEV << " " << ENOMEM << " " << std::endl;
+    int cameraRequestCode = 0;
+    if (cameraID == 0)
+    {
+        cameraRequestCode = camera0->queueRequest(request);
+        // queueRequest() should return 0 if everything is okay
+        if (!cameraRequestCode)
+        {
+            std::cout << "Camera0 request complete\n\n";
+        }
+        else
+        {
+
+            std::cout << "Camera0 failed with the following error : " << cameraRequestCode << std::endl;
+        }
+    }
+    else
+    {
+        cameraRequestCode = camera1->queueRequest(request);
+
+        if (!cameraRequestCode)
+        {
+            std::cout << "Camera1 request complete\n\n";
+        }
+        else
+        {
+            std::cout << "Camera0 failed with the following error : " << cameraRequestCode << std::endl;
+        }
+    }
 }
 
 /*
@@ -672,7 +712,7 @@ int main()
         size_t allocated = allocator->buffers(cfg.stream()).size();
         // size_t allocated2 = allocator2->buffers(cfg.stream()).size();
 
-        std::cout << "Memory allocated for camera 0 : [ " << allocated << " ] " << std::endl;
+        std::cout << "Memory allocated for camera0 : [ " << allocated << " ] " << std::endl;
         // std::cout << "Allocated : [ " << allocated << " ] and " << "[ " << allocated2 << " ]" << " for camera stream(s)" << std::endl;
 
         // std::cin.get();
@@ -697,7 +737,7 @@ int main()
 
         size_t allocated2 = allocator2->buffers(cfg.stream()).size();
 
-        std::cout << "Memory allocated for camera 1 : [ " << allocated2 << " ] " << std::endl;
+        std::cout << "Memory allocated for camera1 : [ " << allocated2 << " ] " << std::endl;
 
         // std::cin.get();
         for (const std::unique_ptr<FrameBuffer> &buffer : allocator->buffers(cfg.stream()))
@@ -824,7 +864,7 @@ int main()
      */
 
     camera0->requestCompleted.connect(requestComplete);
-    camera1->requestCompleted.connect(requestComplete);
+    camera1->requestCompleted.connect(requestComplete2);
 
     /*
      * --------------------------------------------------------------------
@@ -846,6 +886,8 @@ int main()
         std::cout << "Cameras not started\n\n";
         return EXIT_FAILURE;
     }
+    else
+        std::cout << "Cameras started\n\n";
 
     // std::cout << "Requests1 size after push_back: " << requests.size() << std::endl;
     // std::cout << "Requests2 size after push_back: " << requests2.size() << std::endl;
@@ -861,6 +903,7 @@ int main()
         // queueRequest() should return 0
         std::cout << "Camera1 request : " << camera1->queueRequest(request.get()) << std::endl;
     }
+    std::cout << "\n";
 
     /*
      * --------------------------------------------------------------------
