@@ -89,12 +89,13 @@ static void requestComplete2(Request *request)
 
 // Add camera ID parameter to be passed into processRequest
 // static void processRequest(Request *request)
+// ------------------------------------- static void processRequest(Request *request, int cameraID) START -------------------------------------
 static void processRequest(Request *request, int cameraID)
-
 {
-    std::cout << "Process request from Camera : [ " << cameraID << " ]\n";
+    std::cout << "===================== Process request from Camera : [ " << cameraID << " ] ===================== \n";
+
     std::cout << std::endl
-              << "Request completed: " << request->toString() << std::endl;
+              << "Request completed : " << request->toString() << std::endl;
 
     /*
      * When a request has completed, it is populated with a metadata control
@@ -132,6 +133,9 @@ static void processRequest(Request *request, int cameraID)
      * same time, or to allow obtaining the RAW capture buffer from the
      * sensor along with the image as processed by the ISP.
      */
+
+    // ============ ISSUE 8/16/24 : Is there an issue with accessing camera1's buffer????? ============
+    // If you cover camera0 and read the LUX values, the metadata matches the expected low lux values
     const Request::BufferMap &buffers = request->buffers();
     for (auto bufferPair : buffers)
     {
@@ -141,7 +145,7 @@ static void processRequest(Request *request, int cameraID)
         const FrameMetadata &metadata = buffer->metadata();
 
         /* Print some information about the buffer which has completed. */
-        // Segmentation fault with camera1 is somewhere in here 8/16/24
+        // Segmentation fault with camera1 is somewhere in here
         std::cout << " seq: " << std::setw(6) << std::setfill('0') << metadata.sequence
                   << " timestamp: " << metadata.timestamp
                   << " bytesused: ";
@@ -169,19 +173,18 @@ static void processRequest(Request *request, int cameraID)
          * must be mapped by the application
          *
          */
-        /*
-            To do
-                - Fix me
-                - Determine if camera 0 or 1 being used
-                    - If camera 1 add +4 to buffer ?????????
-        */
 
-        // std::cout << "\nCamera ID : " << camera0->id() << std::endl;
-        // std::cout << "Camera ID2 : " << camera1->id() << std::endl;
-
-        img = mappedBuffers_[buffer].get();
-
-        // std::cin.get();
+        if (cameraID == 0)
+        {
+            img = mappedBuffers_[buffer].get();
+            std::cout << "\n\nAccessing Camera0 mapped buffer  : " << img << std::endl;
+        }
+        else if (cameraID == 1)
+        {
+            img = mappedBuffers_2[buffer].get();
+            std::cout << "\n\nAccessing Camera1 mapped buffer : " << img << std::endl;
+        }
+        std::cin.get();
         // if (cameraID == 0)
         // {
         //     img = mappedBuffers_[buffer].get();
@@ -212,14 +215,14 @@ static void processRequest(Request *request, int cameraID)
 
         // std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
 
-        // std::cout << "img  : " << img << std::endl;
-        //  std::cout << "img_ : " << img_ << std::endl;
+        // std::cout << "mappedBuffers_  : " << img << std::endl;
+        // std::cout << "mappedBuffers_2 : " << img_ << std::endl;
 
-        uint8_t *ptr = (uint8_t *)img->data(0).data();
-        // uint8_t *ptr2 = (uint8_t *)img_->data(0).data();
+        // uint8_t *ptr = (uint8_t *)img->data(0).data();
+        //  uint8_t *ptr2 = (uint8_t *)img_->data(0).data();
 
-        std::cout << "\nptr : " << &ptr << std::endl;
-        // std::cout << "ptr2 : " << &ptr2 << std::endl;
+        // std::cout << "\nptr : " << &ptr << std::endl;
+        //  std::cout << "ptr2 : " << &ptr2 << std::endl;
 
         // std::cin.get();
 
@@ -297,12 +300,6 @@ static void processRequest(Request *request, int cameraID)
 
     /* Re-queue the Request to the camera. */
     request->reuse(Request::ReuseBuffers);
-    // std::cout << "\nCamera0 request : " << camera0->queueRequest(request) << std::endl;
-    // std::cout << "Camera1 request : " << camera1->queueRequest(request) << std::endl;
-
-    // camera1->queueRequest(request);
-
-    // std::cout << "Printing out enums " << ENODEV << " " << EACCES << " " << EXDEV << " " << ENOMEM << " " << std::endl;
     int cameraRequestCode = 0;
     if (cameraID == 0)
     {
@@ -310,7 +307,7 @@ static void processRequest(Request *request, int cameraID)
         // queueRequest() should return 0 if everything is okay
         if (!cameraRequestCode)
         {
-            std::cout << "Camera0 request complete\n\n";
+            std::cout << "\nCamera0 request complete\n\n";
         }
         else
         {
@@ -318,20 +315,26 @@ static void processRequest(Request *request, int cameraID)
             std::cout << "Camera0 failed with the following error : " << cameraRequestCode << std::endl;
         }
     }
-    else
+    else if (cameraID == 1)
     {
         cameraRequestCode = camera1->queueRequest(request);
 
         if (!cameraRequestCode)
         {
-            std::cout << "Camera1 request complete\n\n";
+            std::cout << "\nCamera1 request complete\n\n";
         }
         else
         {
             std::cout << "Camera0 failed with the following error : " << cameraRequestCode << std::endl;
         }
     }
+    else
+    {
+        std::cout << "Camera Request error...\n\n";
+        exit(1);
+    }
 }
+// ------------------------------------- static void processRequest(Request *request, int cameraID) END -------------------------------------
 
 /*
  * ----------------------------------------------------------------------------
@@ -705,13 +708,11 @@ int main()
 
         if (ret < 0)
         {
-            std::cerr << "Can't allocate camera buffers for CAMERA 0" << std::endl;
+            std::cerr << "Can't allocate camera buffers for CAMERA 0 due to error code : " << ret << std::endl;
             return EXIT_FAILURE;
         }
 
         size_t allocated = allocator->buffers(cfg.stream()).size();
-        // size_t allocated2 = allocator2->buffers(cfg.stream()).size();
-
         std::cout << "Memory allocated for camera0 : [ " << allocated << " ] " << std::endl;
         // std::cout << "Allocated : [ " << allocated << " ] and " << "[ " << allocated2 << " ]" << " for camera stream(s)" << std::endl;
 
@@ -731,20 +732,18 @@ int main()
 
         if (ret < 0)
         {
-            std::cerr << "Can't allocate camera buffers for CAMERA 1" << std::endl;
+            std::cerr << "Can't allocate camera buffers for CAMERA 0 due to error code : " << ret << std::endl;
             return EXIT_FAILURE;
         }
 
         size_t allocated2 = allocator2->buffers(cfg.stream()).size();
-
         std::cout << "Memory allocated for camera1 : [ " << allocated2 << " ] " << std::endl;
 
-        // std::cin.get();
         for (const std::unique_ptr<FrameBuffer> &buffer : allocator->buffers(cfg.stream()))
         {
             std::unique_ptr<Image> image = Image::fromFrameBuffer(buffer.get(), Image::MapMode::ReadOnly);
             assert(image != nullptr);
-            mappedBuffers_[buffer.get() + 4] = std::move(image);
+            mappedBuffers_2[buffer.get()] = std::move(image);
         }
     }
 
@@ -788,11 +787,6 @@ int main()
                       << std::endl;
             return EXIT_FAILURE;
         }
-        // else
-        // {
-        //     std::cout << "Buffer set for camera 0" << std::endl;
-        // }
-
         /*
          * Controls can be added to a request on a per frame basis.
          */
@@ -802,7 +796,7 @@ int main()
         requests.push_back(std::move(request));
     }
 
-    // Camera 1
+    // Camera1
     Stream *stream2 = streamConfig2.stream();
     const std::vector<std::unique_ptr<FrameBuffer>> &buffers2 = allocator2->buffers(stream2);
     std::vector<std::unique_ptr<Request>> requests2;
@@ -823,10 +817,6 @@ int main()
                       << std::endl;
             return EXIT_FAILURE;
         }
-        // else
-        // {
-        //     std::cout << "Buffer set for camera 1" << std::endl;
-        // }
 
         /*
          * Controls can be added to a request on a per frame basis.
@@ -836,8 +826,8 @@ int main()
         controls.set(controls::AE_ENABLE, true);
         requests2.push_back(std::move(request));
     }
-    std::cout << "\nRequests1 size after push_back : " << requests.size() << std::endl;
-    std::cout << "Requests2 size after push_back : " << requests2.size() << std::endl;
+    // std::cout << "\nRequests1 size after push_back : " << requests.size() << std::endl;
+    // std::cout << "Requests2 size after push_back : " << requests2.size() << std::endl;
 
     // std::cout << "buffers : " << buffers.size() << std::endl;
     // std::cout << "buffers2 : " << buffers2.size() << std::endl;
@@ -887,7 +877,7 @@ int main()
         return EXIT_FAILURE;
     }
     else
-        std::cout << "Cameras started\n\n";
+        std::cout << "\nCameras started\n\n";
 
     // std::cout << "Requests1 size after push_back: " << requests.size() << std::endl;
     // std::cout << "Requests2 size after push_back: " << requests2.size() << std::endl;
@@ -895,15 +885,25 @@ int main()
 
     for (std::unique_ptr<Request> &request : requests)
     {
-        std::cout << "Camera0 request : " << camera0->queueRequest(request.get()) << std::endl;
+        // std::cout << "Camera0 request : " << camera0->queueRequest(request.get()) << std::endl;
+        if (camera0->queueRequest(request.get()))
+        {
+            std::cout << "Can't make request for Camera0....Exiting program now...\r\n\n";
+            return EXIT_FAILURE;
+        }
     }
     std::cout << std::endl;
     for (std::unique_ptr<Request> &request : requests2)
     {
         // queueRequest() should return 0
-        std::cout << "Camera1 request : " << camera1->queueRequest(request.get()) << std::endl;
+        // std::cout << "Camera1 request : " << camera1->queueRequest(request.get()) << std::endl;
+        if (camera1->queueRequest(request.get()))
+        {
+            std::cout << "Can't make request for Camera1....Exiting program now...\r\n\n";
+            return EXIT_FAILURE;
+        }
     }
-    std::cout << "\n";
+    // std::cout << "\n";
 
     /*
      * --------------------------------------------------------------------
