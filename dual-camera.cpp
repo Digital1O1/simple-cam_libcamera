@@ -201,6 +201,8 @@ static void processRequest(Request *request, int cameraID)
             // Display images for Camera 0
             //cv::imshow("Camera 0 - All Data", allData0);
             cv::imshow("Camera 0 - RGB Image", rgb_image0);
+            cv::moveWindow("Camera 0 - RGB Image",100,300);
+
             // cv::imshow("Camera 0 - U Data", uData0);
             // cv::imshow("Camera 0 - V Data", vData0);
         }
@@ -227,6 +229,7 @@ static void processRequest(Request *request, int cameraID)
             // Display images for Camera 1
             //        cv::imshow("Camera 1 - All Data", allData1);
             cv::imshow("Camera 1 - RGB Image", rgb_image1);
+            cv::moveWindow("Camera 1 - RGB Image",900,300);
             // cv::imshow("Camera 1 - U Data", uData1);
             // cv::imshow("Camera 1 - V Data", vData1);
         }
