@@ -28,8 +28,8 @@ SIMPLE_CAM_SRCS = simple-cam.cpp $(COMMON_SRCS)
 DUAL_CAM_SRCS = dual-camera.cpp $(COMMON_SRCS)
 
 # Output executables
-TARGET = simple-cam
-TARGET2 = dual-cam
+TARGET = single-camera
+TARGET2 = dual-camera
 
 # Default target
 all: $(TARGET) $(TARGET2)

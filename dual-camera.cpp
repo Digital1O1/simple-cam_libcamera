@@ -20,7 +20,7 @@
 #include <X11/Xlib.h>
 #include <string>
 
-#define TIMEOUT_SEC 50
+#define TIMEOUT_SEC 9999
 #define RESOLUTION_WIDTH 640
 #define RESOLUTION_HEIGHT 480
 using namespace libcamera;
@@ -65,7 +65,77 @@ std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_2;
 
 static void processRequest(Request *request, int cameraID);
 
-// Duplicate this
+// Helper function to process image data
+cv::Mat processImageData(uint8_t *ptr, const StreamConfiguration &cfg, const cv::Size &fixedResolution)
+{
+    cv::Mat allData = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
+    cv::Mat yData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
+    cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
+    cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
+
+    cv::resize(uData, uData, fixedResolution, 0, 0, cv::INTER_LINEAR);
+    cv::resize(vData, vData, fixedResolution, 0, 0, cv::INTER_LINEAR);
+
+    std::vector<cv::Mat> yuv_channels = {yData, uData, vData};
+    cv::Mat yuv_image;
+    cv::merge(yuv_channels, yuv_image);
+
+    cv::Mat rgb_image;
+    cv::cvtColor(yuv_image, rgb_image, cv::COLOR_YUV2BGR);
+
+    return rgb_image;
+}
+
+cv::Mat concatenateImages(const cv::Mat &image1, const cv::Mat &image2)
+{
+    int total_width = image1.cols + image2.cols;
+    int max_height = std::max(image1.rows, image2.rows);
+
+    // Create a larger image to hold both frames
+    cv::Mat concatenated_image(max_height, total_width, CV_8UC3, cv::Scalar(0, 0, 0));
+
+    // Copy each image into the larger image using copyTo()
+    cv::Mat roi1 = concatenated_image(cv::Rect(0, 0, image1.cols, image1.rows));
+    image1.copyTo(roi1);
+
+    cv::Mat roi2 = concatenated_image(cv::Rect(image1.cols, 0, image2.cols, image2.rows));
+    image2.copyTo(roi2);
+
+    return concatenated_image;
+}
+
+void displayImage(const cv::Mat &image, const std::string &windowName)
+{
+    int imageWidth = image.cols;
+    int imageHeight = image.rows;
+
+    int screenWidth = 1920;
+    int screenHeight = 1080;
+
+    // Calculate the position to center the window
+    int x = (screenWidth - imageWidth) / 2;
+    int y = (screenHeight - imageHeight) / 2;
+
+    cv::imshow(windowName, image);
+    cv::moveWindow(windowName, x, y);
+    cv::waitKey(1);
+}
+
+// void displayImage(const cv::Mat &image, const std::string &windowName)
+// {
+//     const int screenWidth = 1920;
+//     const int screenHeight = 1080;
+
+//     // Resize image to fit the screen
+//     cv::Mat resizedImage;
+//     cv::resize(image, resizedImage, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_LINEAR);
+
+//     // Display the resized image
+//     cv::imshow(windowName, resizedImage);
+//     cv::moveWindow(windowName, 0, 0); // Move window to top-left corner
+//     cv::waitKey(1);
+// }
+
 static void requestComplete(Request *request)
 {
     if (request->status() == Request::RequestCancelled)
@@ -94,6 +164,11 @@ static void requestComplete2(Request *request)
 // ------------------------------------- static void processRequest(Request *request, int cameraID) START -------------------------------------
 static void processRequest(Request *request, int cameraID)
 {
+    static cv::Mat rgb_image0;
+    static cv::Mat rgb_image1;
+    static bool has_image0 = false;
+    static bool has_image1 = false;
+
     std::cout << "===================== Process request from Camera : [ " << cameraID << " ] ===================== \n";
 
     std::cout << std::endl
@@ -136,8 +211,6 @@ static void processRequest(Request *request, int cameraID)
      * sensor along with the image as processed by the ISP.
      */
 
-    // ============ ISSUE 8/16/24 : Is there an issue with accessing camera1's buffer????? ============
-    // If you cover camera0 and read the LUX values, the metadata matches the expected low lux values
     const Request::BufferMap &buffers = request->buffers();
     for (auto bufferPair : buffers)
     {
@@ -175,63 +248,50 @@ static void processRequest(Request *request, int cameraID)
          * must be mapped by the application
          *
          */
+
+        // Access the correct mapped buffer based on cameraID
+        /*
+            Notes about Ternary operator
+                - Syntax : condition ? expression1 : expression2;
+                - if condition TRUE
+                    - expression1 executed
+                - If condition FALSE
+                    - expression2 executed
+
+            Things that need to happen in the following section
+                - Get access to perspective mappedBuffers_
+                - Use ptrs to gain access to image data
+                - Send pixel data to processImageData()
+        */
+
+        auto &mappedBuffer = (cameraID == 0) ? mappedBuffers_ : mappedBuffers_2;
+
+        img = mappedBuffer[buffer].get();
+        // std::cout << "Camera ID : " << cameraID << "\t" << "img : " << img << std::endl;
+        //  std::cin.get();
+
+        uint8_t *ptr = (uint8_t *)img->data(0).data();
+        // uint8_t *ptr = (uint8_t *)img->data(0).data();
         cv::Size fixedResolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
-        cv::Size fixedResolutionLuminance(cfg.size.height * 3 / 2, cfg.size.width);
+
+        cv::Mat rgb_image = processImageData(ptr, stream->configuration(), fixedResolution);
+
+        // Concatenate here
+
+        // std::string windowName = "Camera " + std::to_string(cameraID) + " - RGB Image";
+        // int xPos = (cameraID == 0) ? 100 : 900;
+        // displayImage(rgb_image, windowName, xPos, 300);
+
+        // Store the processed image based on cameraID
         if (cameraID == 0)
         {
-            img = mappedBuffers_[buffer].get();
-            // std::cout << "\n\nAccessing Camera0 mapped buffer  : " << img << std::endl;
-            uint8_t *ptr = (uint8_t *)img->data(0).data();
-
-            cv::Mat allData0 = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
-            cv::Mat yData0 = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
-            cv::Mat uData0 = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
-            cv::Mat vData0 = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
-
-            cv::resize(uData0, uData0, fixedResolution, 0, 0, cv::INTER_LINEAR);
-            cv::resize(vData0, vData0, fixedResolution, 0, 0, cv::INTER_LINEAR);
-
-            std::vector<cv::Mat> yuv_channels0 = {yData0, uData0, vData0};
-            cv::Mat yuv_image0;
-            cv::merge(yuv_channels0, yuv_image0);
-
-            cv::Mat rgb_image0;
-            cv::cvtColor(yuv_image0, rgb_image0, cv::COLOR_YUV2BGR);
-
-            // Display images for Camera 0
-            //cv::imshow("Camera 0 - All Data", allData0);
-            cv::imshow("Camera 0 - RGB Image", rgb_image0);
-            cv::moveWindow("Camera 0 - RGB Image",100,300);
-
-            // cv::imshow("Camera 0 - U Data", uData0);
-            // cv::imshow("Camera 0 - V Data", vData0);
+            rgb_image0 = rgb_image;
+            has_image0 = true;
         }
         else if (cameraID == 1)
         {
-            img2 = mappedBuffers_2[buffer].get();
-            // std::cout << "\n\nAccessing Camera1 mapped buffer : " << img << std::endl;
-            uint8_t *ptr2 = (uint8_t *)img2->data(0).data();
-            cv::Mat allData1 = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr2, cfg.stride);
-            cv::Mat yData1 = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr2, cfg.stride);
-            cv::Mat uData1 = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr2 + cfg.size.width * cfg.size.height);
-            cv::Mat vData1 = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr2 + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
-
-            cv::resize(uData1, uData1, fixedResolution, 0, 0, cv::INTER_LINEAR);
-            cv::resize(vData1, vData1, fixedResolution, 0, 0, cv::INTER_LINEAR);
-
-            std::vector<cv::Mat> yuv_channels1 = {yData1, uData1, vData1};
-            cv::Mat yuv_image1;
-            cv::merge(yuv_channels1, yuv_image1);
-
-            cv::Mat rgb_image1;
-            cv::cvtColor(yuv_image1, rgb_image1, cv::COLOR_YUV2BGR);
-
-            // Display images for Camera 1
-            //        cv::imshow("Camera 1 - All Data", allData1);
-            cv::imshow("Camera 1 - RGB Image", rgb_image1);
-            cv::moveWindow("Camera 1 - RGB Image",900,300);
-            // cv::imshow("Camera 1 - U Data", uData1);
-            // cv::imshow("Camera 1 - V Data", vData1);
+            rgb_image1 = rgb_image;
+            has_image1 = true;
         }
         else
         {
@@ -239,61 +299,19 @@ static void processRequest(Request *request, int cameraID)
             exit(1);
         }
 
-        // const libcamera::ColorSpace &colorSpace = libcamera::ColorSpace(cfg.colorSpace.value());
-        // std::string colorSpaceStr = colorSpace.toString();
+        // Display concatenated images when both are available
+        if (has_image0 && has_image1)
+        {
+            cv::Mat concatenated_image = concatenateImages(rgb_image0, rgb_image1);
+            displayImage(concatenated_image, "Video resolution 640 x 480");
+            // cv::imshow("Concatenated Camera Frames", concatenated_image);
+            // cv::waitKey(1);
 
-        // std::cout << "\n --------------------------- [DEBUG INFORMATION ]---------------------------" << std::endl;
-        // std::cout << "\n"
-        //           << "Resolution" << " : " << cfg.size.width << " x " << cfg.size.height << std::endl;
-        // std::cout << "Number of bytes in each line of image buffer " << " : " << cfg.stride << std::endl;
-        // std::cout << "pixelFormat" << " : " << cfg.pixelFormat << std::endl;
-        // std::cout << "img->numPlanes() : " << img->numPlanes() << std::endl;
-        // std::cout << "Color Space : " << colorSpaceStr << std::endl;                                                                          // sYCC
-        // std::cout << "colorSpace.Primaries : " << (int)libcamera::ColorSpace::Primaries(colorSpace.primaries) << std::endl;                   // Rec709
-        // std::cout << "colorSpace.TransferFunction : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.transferFunction) << std::endl; // Srgb
-        // std::cout << "colorSpace.ycbcrEncoding : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.ycbcrEncoding) << std::endl;       // Rec601
-        // std::cout << "colorSpace.Range : " << (int)libcamera::ColorSpace::YcbcrEncoding(colorSpace.range) << std::endl;                       // Full
-
-        // std::cout << "\n ---------------------------------------------------------------------------" << std::endl;
-
-        /*
-            cv::Mat(int rows,int cols,int type, void *data, size_t step)
-            rows
-                - Number of rows in a 2D array.
-            cols
-                - Number of columns in a 2D array.
-            type
-                - Array type. Use CV_8UC1, ..., CV_64FC4 to create 1-4 channel matrices, or CV_8UC(n), ..., CV_64FC(n) to create multi-channel (up to CV_CN_MAX channels) matrices.
-            data
-                - Pointer to the user data. Matrix constructors that take data and step parameters do not allocate matrix data. Instead, they just initialize the matrix header that points to the specified data, which means that no data is copied. This operation is very efficient and can be used to process external data using OpenCV functions. The external data is not automatically deallocated, so you should take care of it.
-            step
-                - Number of bytes each matrix row occupies. The value should include the padding bytes at the end of each row, if any. If the parameter is missing (set to AUTO_STEP ), no padding is assumed and the actual step is calculated as cols*elemSize(). See Mat::elemSize.
-
-        */
-
-        // Things to do
-        // - Do matrix math to convert data saved in the separate Mat objects into color
-        // - Use cv::merge() to combine everything then use cv::imshow() to verify
-        // Gets all LUMINANCE data
-
-        // RPI Screen stuff
-        // Display *d = XOpenDisplay(NULL);
-        // Screen *s = DefaultScreenOfDisplay(d);
-
-        // int screen_width = s->width;
-        // int screen_height = s->height;
-
-        // cv::Size fixedResolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
-        // cv::Size fixedResolutionLuminance(cfg.size.height * 3 / 2, cfg.size.width);
-
-        // For Camera 0
-        // const libcamera::ColorSpace &colorSpace0 = libcamera::ColorSpace(cfg.colorSpace.value());
-
-        // For Camera 1
-        // Image *img1 = mappedBuffers_2[buffer].get();
-        // const libcamera::ColorSpace &colorSpace1 = libcamera::ColorSpace(cfg.colorSpace.value());
-
-        cv::waitKey(1);
+            // Reset flags for the next frame
+            has_image0 = false;
+            has_image1 = false;
+        }
+        // cv::waitKey(1);
     }
 
     /* Re-queue the Request to the camera. */
