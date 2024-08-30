@@ -164,8 +164,8 @@ static void requestComplete2(Request *request)
 // ------------------------------------- static void processRequest(Request *request, int cameraID) START -------------------------------------
 static void processRequest(Request *request, int cameraID)
 {
-    static cv::Mat rgb_image0;
-    static cv::Mat rgb_image1;
+    static cv::Mat leftImage;
+    static cv::Mat rightImage;
     static bool has_image0 = false;
     static bool has_image1 = false;
 
@@ -267,6 +267,11 @@ static void processRequest(Request *request, int cameraID)
         auto &mappedBuffer = (cameraID == 0) ? mappedBuffers_ : mappedBuffers_2;
 
         img = mappedBuffer[buffer].get();
+        if (img == nullptr)
+        {
+            std::cout << "--------- Error: Image buffer is null press ENTER to continue.... ---------" << std::endl;
+            std::cin.get();
+        }
         // std::cout << "Camera ID : " << cameraID << "\t" << "img : " << img << std::endl;
         //  std::cin.get();
 
@@ -276,21 +281,15 @@ static void processRequest(Request *request, int cameraID)
 
         cv::Mat rgb_image = processImageData(ptr, stream->configuration(), fixedResolution);
 
-        // Concatenate here
-
-        // std::string windowName = "Camera " + std::to_string(cameraID) + " - RGB Image";
-        // int xPos = (cameraID == 0) ? 100 : 900;
-        // displayImage(rgb_image, windowName, xPos, 300);
-
         // Store the processed image based on cameraID
         if (cameraID == 0)
         {
-            rgb_image0 = rgb_image;
+            leftImage = rgb_image;
             has_image0 = true;
         }
         else if (cameraID == 1)
         {
-            rgb_image1 = rgb_image;
+            rightImage = rgb_image;
             has_image1 = true;
         }
         else
@@ -302,7 +301,11 @@ static void processRequest(Request *request, int cameraID)
         // Display concatenated images when both are available
         if (has_image0 && has_image1)
         {
-            cv::Mat concatenated_image = concatenateImages(rgb_image0, rgb_image1);
+            // Using resize() slows everything down alot
+            // Syntax : cv::resize (InputArray src, OutputArray dst, Size dsize, double fx=0, double fy=0, int interpolation=INTER_LINEAR)
+            cv::resize(leftImage, leftImage, cv::Size(1920, 1080), cv::INTER_NEAREST);
+            cv::resize(rightImage, rightImage, cv::Size(1920, 1080), cv::INTER_NEAREST);
+            cv::Mat concatenated_image = concatenateImages(leftImage, rightImage);
             displayImage(concatenated_image, "Video resolution 640 x 480");
             // cv::imshow("Concatenated Camera Frames", concatenated_image);
             // cv::waitKey(1);
@@ -327,8 +330,9 @@ static void processRequest(Request *request, int cameraID)
         }
         else
         {
-
-            std::cout << "Camera0 failed with the following error : " << cameraRequestCode << std::endl;
+            std::cout << cameraID << " failed with the following error : " << cameraRequestCode << std::endl;
+            std::cout << "Press ENTER to continue...." << std::endl;
+            std::cin.get();
         }
     }
     else if (cameraID == 1)
@@ -341,7 +345,9 @@ static void processRequest(Request *request, int cameraID)
         }
         else
         {
-            std::cout << "Camera0 failed with the following error : " << cameraRequestCode << std::endl;
+            std::cout << cameraID << " failed with the following error : " << cameraRequestCode << std::endl;
+            std::cout << "Press ENTER to continue...." << std::endl;
+            std::cin.get();
         }
     }
     else
@@ -402,24 +408,6 @@ std::string cameraName(Camera *camera)
 
 int main()
 {
-    // Not really needed but was used to troubleshoot moveWindow() bug when using WAYLAND
-    // Create | Resize | Move
-    // cv::Size windowResolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
-    // cv::Size fixedResolutionLuminance(windowResolution.width * 3 / 2, windowResolution.height);
-
-    // cv::namedWindow("rgb_image", cv::WINDOW_KEEPRATIO);
-    // cv::resizeWindow("rgb_image", windowResolution.width, windowResolution.height);
-    // cv::namedWindow("YUVData", cv::WINDOW_KEEPRATIO);
-    // cv::resizeWindow("YUVData", fixedResolutionLuminance.width, fixedResolutionLuminance.height);
-    // cv::moveWindow("YUVData", 100, 100);
-    // cv::moveWindow("rgb_image", 1200, 100);
-
-    // Used for a sanity check since Wayland isn't supported with the moveWindow() function
-    // cv::Mat blankImage = cv::Mat::zeros(480, 640, CV_8UC3);
-    // cv::namedWindow("Blank Image", cv::WINDOW_KEEPRATIO);
-    // cv::imshow("Blank Image", blankImage);
-    // cv::moveWindow("Blank Image", 1200, 800);
-
     /*
      * --------------------------------------------------------------------
      * Create a Camera Manager.
@@ -930,11 +918,11 @@ int main()
      * In order to dispatch events received from the video devices, such
      * as buffer completions, an event loop has to be run.
      */
-    loop.timeout(TIMEOUT_SEC);
-    int ret = loop.exec();
-    std::cout << "Capture ran for [ " << TIMEOUT_SEC << " ] seconds and "
-              << "stopped with exit status : " << ret << std::endl;
-
+    // loop.timeout(TIMEOUT_SEC);
+    // int ret = loop.exec();
+    // std::cout << "Capture ran for [ " << TIMEOUT_SEC << " ] seconds and "
+    //           << "stopped with exit status : " << ret << std::endl;
+    loop.exec();
     /*
      * --------------------------------------------------------------------
      * Clean Up
