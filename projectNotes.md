@@ -6,8 +6,12 @@
   - Install QT dev tools : `sudo apt-get install qt6-base-dev-tools`
   - Verify using : `which moc`
     - Add to PATH if needed : `export PATH=/usr/lib/qt6/bin:$PATH`
+- gprof to profile program 
 
-
+```bash
+# Example code to generate graph 
+gprof a.out gmon.out | gprof2dot -s -w | dot -Gdpi=200 -Tpng -o result.png
+```
 
 
 # Useful references 

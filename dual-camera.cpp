@@ -20,9 +20,9 @@
 #include <X11/Xlib.h>
 #include <string>
 
-#define TIMEOUT_SEC 9999
-#define RESOLUTION_WIDTH 640
-#define RESOLUTION_HEIGHT 480
+#define TIMEOUT_SEC 10
+#define RESOLUTION_WIDTH 1280
+#define RESOLUTION_HEIGHT 720
 using namespace libcamera;
 static std::shared_ptr<Camera> camera0;
 static std::shared_ptr<Camera> camera1;
@@ -65,22 +65,28 @@ std::map<libcamera::FrameBuffer *, std::unique_ptr<Image>> mappedBuffers_2;
 
 static void processRequest(Request *request, int cameraID);
 
-// Helper function to process image data
 cv::Mat processImageData(uint8_t *ptr, const StreamConfiguration &cfg, const cv::Size &fixedResolution)
 {
+    // TO DO: Preallocate cv::Mat objects for y/u/v data before hadd
+    // Also check out cv::parallel_for_ and SIMD stuff
     cv::Mat allData = cv::Mat(cfg.size.height * 3 / 2, cfg.size.width, CV_8U, ptr, cfg.stride);
     cv::Mat yData = cv::Mat(cfg.size.height, cfg.size.width, CV_8U, ptr, cfg.stride);
     cv::Mat uData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height);
     cv::Mat vData = cv::Mat(cfg.size.height / 2, cfg.size.width / 2, CV_8U, ptr + cfg.size.width * cfg.size.height + cfg.size.width / 2 * cfg.size.height / 2);
 
+    // When using perf report to determine how long everything is taking the resize() functions did take up 18.58% of the time
     cv::resize(uData, uData, fixedResolution, 0, 0, cv::INTER_LINEAR);
     cv::resize(vData, vData, fixedResolution, 0, 0, cv::INTER_LINEAR);
 
     std::vector<cv::Mat> yuv_channels = {yData, uData, vData};
     cv::Mat yuv_image;
+
+    // Merging Channels (combine3 at 8.06%)
     cv::merge(yuv_channels, yuv_image);
 
     cv::Mat rgb_image;
+
+    // Color Conversion (rgb2bgr at 18.38% and YCrCb2RGB at 15.22%)
     cv::cvtColor(yuv_image, rgb_image, cv::COLOR_YUV2BGR);
 
     return rgb_image;
@@ -91,7 +97,6 @@ cv::Mat concatenateImages(const cv::Mat &image1, const cv::Mat &image2)
     int total_width = image1.cols + image2.cols;
     int max_height = std::max(image1.rows, image2.rows);
 
-    // Create a larger image to hold both frames
     cv::Mat concatenated_image(max_height, total_width, CV_8UC3, cv::Scalar(0, 0, 0));
 
     // Copy each image into the larger image using copyTo()
@@ -166,6 +171,7 @@ static void processRequest(Request *request, int cameraID)
 {
     static cv::Mat rgb_image0;
     static cv::Mat rgb_image1;
+    cv::Mat combinedImage;
     static bool has_image0 = false;
     static bool has_image1 = false;
 
@@ -302,8 +308,13 @@ static void processRequest(Request *request, int cameraID)
         // Display concatenated images when both are available
         if (has_image0 && has_image1)
         {
-            cv::Mat concatenated_image = concatenateImages(rgb_image0, rgb_image1);
-            displayImage(concatenated_image, "Video resolution 640 x 480");
+            cv::hconcat(rgb_image0, rgb_image1, combinedImage);
+            displayImage(combinedImage, "CombinedImage");
+            // cv::imshow("CombinedImage",combinedImage)
+
+            // cv::Mat concatenated_image = concatenateImages(rgb_image0, rgb_image1);
+
+            // displayImage(concatenated_image, "Video resolution 1280 x 720");
             // cv::imshow("Concatenated Camera Frames", concatenated_image);
             // cv::waitKey(1);
 
@@ -930,6 +941,8 @@ int main()
      * In order to dispatch events received from the video devices, such
      * as buffer completions, an event loop has to be run.
      */
+
+    //loop.exec();
     loop.timeout(TIMEOUT_SEC);
     int ret = loop.exec();
     std::cout << "Capture ran for [ " << TIMEOUT_SEC << " ] seconds and "
