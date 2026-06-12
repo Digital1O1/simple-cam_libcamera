@@ -26,8 +26,6 @@
 using namespace libcamera;
 static std::shared_ptr<Camera> camera0;
 static std::shared_ptr<Camera> camera1;
-Image *img;
-Image *img2;
 
 static EventLoop loop;
 
@@ -141,26 +139,19 @@ void displayImage(const cv::Mat &image, const std::string &windowName)
 //     cv::waitKey(1);
 // }
 
+/*
+ * A single slot serves both cameras. The camera index is supplied as a
+ * template parameter so each instantiation is still a plain free function
+ * pointer (requestComplete<0>, requestComplete<1>) that can be passed to
+ * Signal::connect(), while the body lives in one place.
+ */
+template <int cameraID>
 static void requestComplete(Request *request)
 {
     if (request->status() == Request::RequestCancelled)
         return;
 
-    // std::string cameraID = camera0->id();
-    int cameraID = 0;
-
-    loop.callLater([request, cameraID]()
-                   { processRequest(request, cameraID); });
-}
-
-static void requestComplete2(Request *request)
-{
-    if (request->status() == Request::RequestCancelled)
-        return;
-
-    // std::string cameraID = camera1->id();
-    int cameraID = 1;
-    loop.callLater([request, cameraID]()
+    loop.callLater([request]()
                    { processRequest(request, cameraID); });
 }
 
@@ -272,7 +263,7 @@ static void processRequest(Request *request, int cameraID)
 
         auto &mappedBuffer = (cameraID == 0) ? mappedBuffers_ : mappedBuffers_2;
 
-        img = mappedBuffer[buffer].get();
+        Image *img = mappedBuffer[buffer].get();
         // std::cout << "Camera ID : " << cameraID << "\t" << "img : " << img << std::endl;
         //  std::cin.get();
 
@@ -882,8 +873,8 @@ int main()
      * Signal before the camera is started.
      */
 
-    camera0->requestCompleted.connect(requestComplete);
-    camera1->requestCompleted.connect(requestComplete2);
+    camera0->requestCompleted.connect(requestComplete<0>);
+    camera1->requestCompleted.connect(requestComplete<1>);
 
     /*
      * --------------------------------------------------------------------
@@ -959,7 +950,10 @@ int main()
     camera1->stop();
 
     allocator->free(stream);
+    allocator2->free(stream2);
     delete allocator;
+    delete allocator2;
+
     camera0->release();
     camera1->release();
 

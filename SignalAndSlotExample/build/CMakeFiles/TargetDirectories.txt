@@ -1,3 +1,0 @@
-/home/digital101/simple-cam_libcamera/SignalAndSlotExample/build/CMakeFiles/SignalAndSlotExample.dir
-/home/digital101/simple-cam_libcamera/SignalAndSlotExample/build/CMakeFiles/edit_cache.dir
-/home/digital101/simple-cam_libcamera/SignalAndSlotExample/build/CMakeFiles/rebuild_cache.dir
